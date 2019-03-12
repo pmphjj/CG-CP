@@ -43,14 +43,11 @@ all_orders_p = set(orders_df.PATIENT_ID)
 all_p_variation = set(cp_variation_info.PATIENT_ID)
 
 
-# In[80]:
-
-
 # 没有发生变异的病人
 list(filter(lambda x: x not in all_p_variation, all_orders_p))
 
-
-
 # 关闭数据库连接
 conn.close()
+
+
 
