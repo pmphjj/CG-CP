@@ -2,6 +2,7 @@ import json
 import sqlite3
 import pandas as pd
 import datetime
+import Orders
 
 
 class Build_Visist_Order(object):
@@ -75,12 +76,12 @@ class Visit(object):
             # 将这一天中的每一个医嘱变为dict,并存入day_list中
             for order in day_info.iterrows():
 
-                # 将医嘱信息录入Orders_Dict类
-
-
                 # 将一个医嘱信息变为dict
                 order_dict = dict([(k, day_info[1][k]) for k in order_columns])
                 day_list.append(order_dict)
+
+                # 将医嘱信息添加进入医嘱字典
+                Orders.Orders_Dict.add_orders(order_dict)
 
             self.day_level_info[date] = day_list
 
