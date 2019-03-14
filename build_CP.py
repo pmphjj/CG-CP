@@ -2,6 +2,7 @@ import json
 import sqlite3
 import pandas as pd
 import Orders
+from collections import defaultdict
 
 class Clinical_Pathway(object):
     def __init__(self, cp_id, version_sqno, db_config_path="./db_config.json"):
@@ -84,8 +85,8 @@ class Stages(object):
             end_day
             stage_desc
             stage_name
-            stage_item_codes_set: set,该阶段所有药物编号的集合
-            stage_orders_detail: 字典,药物code ---> 药物的详细信息
+            stage_item_codes_set: set,该阶段所有医嘱编号的集合
+            stage_orders_detail: 字典,该阶段包含的医嘱code ---> 医嘱的详细信息
         '''
 
         self.cp_id = cp_id
@@ -99,6 +100,7 @@ class Stages(object):
 
         self.stage_item_codes_set = set()
         self.stage_orders_detail = dict()
+        self.stage_variation = CP_Variation()
 
         # 获取该阶段的药物codes
         cp_orders = pd.read_sql_query(
@@ -110,23 +112,59 @@ class Stages(object):
 
             self.stage_item_codes_set.add(each_order[1]["CLINIC_ITEM_CODE"])
 
-            # 创建药物详情
+            # 创建医嘱详情
             each_order_dict = dict([(k, each_order[1][k]) for k in cp_orders_columns_list])
             self.stage_orders_detail[each_order[1]["CLINIC_ITEM_CODE"]] = Orders.Basic_Order_Info(each_order_dict)
+
+            # 将医嘱放入医嘱字典
+            Orders.Orders_Dict.add_orders(each_order_dict)
+
         return
 
 
-    def add_orders(self):
+    def add_variation(self, order_code):
+        '''
+            添加异常，若order_code在stage_item_codes_set中出现，则说明是必选项未选异常，否则为新增异常
+        :param order_code: 
+        :return: 
+        '''
+
+        if order_code in self.stage_item_codes_set:
+            # 必选项未选异常
+            self.stage_variation.noselect_variation[order_code] += 1
+            self.stage_variation.update_noselect_num()
+        else:
+            # 新增异常
+            self.stage_variation.newadd_variation[order_code] += 1
+            self.stage_variation.update_newadd_num()
+
+
+
+    def add_orders(self, order_code):
         '''
             添加医嘱进该阶段
         :return: 
         '''
 
-    def delete_orders(self):
+        if order_code in self.stage_item_codes_set:
+            print("ERROR: Order has already existed in stage")
+        else:
+            self.stage_item_codes_set.add(order_code)
+            self.stage_orders_detail[order_code] = Orders.Orders_Dict.get_orders(order_code)
+        return
+
+    def delete_orders(self, order_code):
         '''
             删除该阶段的医嘱
         :return: 
         '''
+
+        if order_code not in self.stage_item_codes_set:
+            print("ERROR: Order code is not in stage")
+        else:
+            self.stage_item_codes_set.remove(order_code)
+            self.stage_orders_detail.pop(order_code)
+        return
 
 
     def __str__(self):
@@ -136,9 +174,27 @@ class Stages(object):
         return ",".join(self.stage_item_codes_set)
 
 
+
 class CP_Variation(object):
 
+    def __init__(self):
+        '''
+            异常类，定义两个异常，分别是新增异常以及必选项未选异常，存储的都是医嘱code的集合
+        '''
 
+        self.variation_num = 0
+        self.newadd_variation_num = 0
+        self.noselect_variation_num = 0
+        self.newadd_variation = defaultdict(int)
+        self.noselect_variation = defaultdict(int)
+
+    def update_newadd_num(self):
+        self.newadd_variation_num += 1
+        self.variation_num += 1
+
+    def update_noselect_num(self):
+        self.noselect_variation_num += 1
+        self.variation_num += 1
 
 if __name__ == "__main__":
     cp = Clinical_Pathway("4,621", "3")

@@ -7,7 +7,7 @@ class Orders_Dict(object):
     def add_orders(order_info):
         '''
             向字典中添加医嘱
-        :param order_info: 
+        :param order_info: 是一个dict格式的
         :return: 
         '''
 
@@ -16,6 +16,15 @@ class Orders_Dict(object):
             return
         else:
             Orders_Dict.orders_dict[order_info["CLINIC_ITEM_CODE"]] = Basic_Order_Info(order_info)
+
+    @staticmethod
+    def get_orders(order_code):
+
+        if order_code in Orders_Dict.orders_dict:
+            return Orders_Dict.orders_dict[order_code]
+        else:
+            print("Order not in Order_Dict")
+            return None
 
 
 class Basic_Order_Info(object):
@@ -36,3 +45,4 @@ class Basic_Order_Info(object):
         self.order_name = order["ORDER_NAME"]
 
         return
+
