@@ -27,6 +27,7 @@ class Clinical_Pathway(object):
         self.stage_nums = 0
 
         self.stage = dict()
+        self.required_order_dict = dict()
 
         # 读取数据库,建立连接
         with open(db_config_path, "r") as f:
@@ -34,7 +35,7 @@ class Clinical_Pathway(object):
         self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
 
         self.__build_cp__()
-
+        self.show_info()
         self.conn.close()
         return
 
@@ -69,6 +70,16 @@ class Clinical_Pathway(object):
 
         return CP_str
 
+    def update_required_order_dict(self):
+        #TODO 更新必选词表
+        pass
+
+    def show_info(self):
+        #展示类的基本信息
+        print("cp_id:"+self.cp_id)
+        print("cp_name:"+self.cp_name)
+        print("stage_nums:"+str(self.stage_nums))
+        print(self.__str__())
 
     def get_stage_code(self,x):
         """
@@ -76,8 +87,9 @@ class Clinical_Pathway(object):
         :param x:
         :return:
         """
+        x = str(x)
         if x not in self.stage:
-            print("ERROR: input stage number is invalid.")
+            print("ERROR: input stage number {} is invalid.".format(x))
             return
         return self.stage[x].stage_item_codes_set
 
@@ -88,8 +100,9 @@ class Clinical_Pathway(object):
         :param x: 临床路径阶段序号
         :return:
         """
+        x = str(x)
         if x not in self.stage:
-            print("ERROR: input stage number is invalid.")
+            print("ERROR: input stage number {} is invalid.".format(x))
             return
         for order_code in var_code_set:
             self.stage[x].add_variation(order_code)
