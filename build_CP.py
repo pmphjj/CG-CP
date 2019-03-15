@@ -139,7 +139,6 @@ class Stages(object):
             self.stage_variation.update_newadd_num()
 
 
-
     def add_orders(self, order_code):
         '''
             添加医嘱进该阶段
