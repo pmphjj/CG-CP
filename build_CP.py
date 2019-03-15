@@ -70,6 +70,31 @@ class Clinical_Pathway(object):
         return CP_str
 
 
+    def get_stage_code(self,x):
+        """
+        获取第x阶段的医嘱编码集合
+        :param x:
+        :return:
+        """
+        if x not in self.stage:
+            print("ERROR: input stage number is invalid.")
+            return
+        return self.stage[x].stage_item_codes_set
+
+    def add_variation_to_stage(self,var_code_set,x):
+        """
+        向阶段中添加变异
+        :param var_code_set: 变异医嘱的编码set集合
+        :param x: 临床路径阶段序号
+        :return:
+        """
+        if x not in self.stage:
+            print("ERROR: input stage number is invalid.")
+            return
+        for order_code in var_code_set:
+            self.stage[x].add_variation(order_code)
+
+
 class Stages(object):
     def __init__(self, cp_id, version_sqno, stage_info, conn):
         '''
