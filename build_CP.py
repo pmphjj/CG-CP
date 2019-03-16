@@ -93,19 +93,19 @@ class Clinical_Pathway(object):
             return
         return self.stage[x].stage_item_codes_set
 
-    def add_variation_to_stage(self,var_code_set,x):
-        """
-        向阶段中添加变异
-        :param var_code_set: 变异医嘱的编码set集合
-        :param x: 临床路径阶段序号
-        :return:
-        """
-        x = str(x)
-        if x not in self.stage:
-            print("ERROR: input stage number {} is invalid.".format(x))
-            return
-        for order_code in var_code_set:
-            self.stage[x].add_variation(order_code)
+    # def add_variation_to_stage(self,var_code_set,x):
+    #     """
+    #     向阶段中添加变异
+    #     :param var_code_set: 变异医嘱的编码set集合
+    #     :param x: 临床路径阶段序号
+    #     :return:
+    #     """
+    #     x = str(x)
+    #     if x not in self.stage:
+    #         print("ERROR: input stage number {} is invalid.".format(x))
+    #         return
+    #     for order_code in var_code_set:
+    #         self.stage[x].add_variation(order_code)
 
 
 class Stages(object):
@@ -138,7 +138,7 @@ class Stages(object):
 
         self.stage_item_codes_set = set()
         self.stage_orders_detail = dict()
-        self.stage_variation = CP_Variation()
+        # self.stage_variation = CP_Variation()
 
         # 获取该阶段的药物codes
         cp_orders = pd.read_sql_query(
@@ -160,21 +160,21 @@ class Stages(object):
         return
 
 
-    def add_variation(self, order_code):
-        '''
-            添加异常，若order_code在stage_item_codes_set中出现，则说明是必选项未选异常，否则为新增异常
-        :param order_code: 
-        :return: 
-        '''
-
-        if order_code in self.stage_item_codes_set:
-            # 必选项未选异常
-            self.stage_variation.noselect_variation[order_code] += 1
-            self.stage_variation.update_noselect_num()
-        else:
-            # 新增异常
-            self.stage_variation.newadd_variation[order_code] += 1
-            self.stage_variation.update_newadd_num()
+    # def add_variation(self, order_code):
+    #     '''
+    #         添加异常，若order_code在stage_item_codes_set中出现，则说明是必选项未选异常，否则为新增异常
+    #     :param order_code:
+    #     :return:
+    #     '''
+    #
+    #     if order_code in self.stage_item_codes_set:
+    #         # 必选项未选异常
+    #         self.stage_variation.noselect_variation[order_code] += 1
+    #         self.stage_variation.update_noselect_num()
+    #     else:
+    #         # 新增异常
+    #         self.stage_variation.newadd_variation[order_code] += 1
+    #         self.stage_variation.update_newadd_num()
 
 
 
@@ -225,6 +225,7 @@ class CP_Variation(object):
         self.noselect_variation_num = 0
         self.newadd_variation = defaultdict(int)
         self.noselect_variation = defaultdict(int)
+
 
     def update_newadd_num(self):
         self.newadd_variation_num += 1
