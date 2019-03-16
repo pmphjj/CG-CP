@@ -90,8 +90,7 @@ class Visit(object):
                 day_list.append(order_dict)
 
                 # 将医嘱信息添加进入医嘱字典
-                #TODO 此处有bug
-                # Orders.Orders_Dict.add_orders(order_dict)
+                Orders.Orders_Dict.add_orders(order_dict)
 
             self.day_level_info[date] = day_list
 
