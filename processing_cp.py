@@ -6,7 +6,16 @@ from Orders import Orders_Dict
 
 class CP_Analyzer(object):
     """
-    临床路径变异分析器
+    临床路径变异分析器,对于特定临床路径和历史visit数据的变异分析类
+    cp: 输入的临床路径
+    visits: 输入的visit集合
+    variation:
+        "cp":
+        "stages":每个stage的变异记录。{stage_num:CP_Variation()}
+        "visits": 每个visit的变异记录。{visit_id:{}}
+            "day_variation":每一天的变异医嘱代码, {日期:set()}
+            "day_stage_map":表示每天属于的阶段,  {日期:(起始阶段,终止阶段)}
+
     """
     def __init__(self,input_cp,input_visits):
         self.cp = input_cp
@@ -20,7 +29,7 @@ class CP_Analyzer(object):
         visits_v = dict()
         for visit_id in self.visits.all_visits_dict:
             visits_v[visit_id] = {"day_variation":dict(),"day_stage_map":dict()}
-        self.variation = {"cp": dict(), "stages": stages_v, "visits": visits_v}
+        self.variation = {"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v}
 
     def get_variation_of_visit(self, input_visit):
         """ 获取一个visit的变异情况
@@ -81,7 +90,6 @@ class CP_Analyzer(object):
             intersec_set = required_set.intersection(compared_set)
             if required_set != intersec_set:
                 stat_var["stage"][stage_num] = stat_var["stage"].setdefault(stage_num, set()).union(required_set.difference(intersec_set))
-
         return stat_var
 
 
@@ -92,6 +100,8 @@ class CP_Analyzer(object):
             self.__update_variation_info(stat_var,visit.visit_id)
 
     def __update_variation_info(self,stat_var,visit_id):
+        if len(stat_var["stage"]) > 0:
+            self.variation["cp"]["visits_count"] += 1
         self.__add_variation_to_visit(stat_var["day"],stat_var["day_stage_map"],visit_id)
         for num in stat_var["stage"]:
             self.__add_variation_to_stage(stat_var["stage"][num],num)
@@ -124,12 +134,37 @@ class CP_Analyzer(object):
                 self.variation["stages"][x].newadd_variation[order_code] += 1
                 self.variation["stages"][x].update_newadd_num()
 
-    def generate_recommendation(self):
-        #TODO 生成临床路径的更新建议，即每个阶段添加的医嘱集合,
-        pass
+    def generate_recommendation(self,method="statistics"):
+        """
+        生成临床路径的更新建议，即每个阶段添加的医嘱集合
+        :param method: 产生更新的方法。
+            "statistics": 默认选择，基于统计值的方法。
+        :return: 每个阶段添加的医嘱集合
+        """
+        if method == "statistics":
+            return self.__analyze_by_stat()
+
+        else:
+            print("ERROR:No method : {}.".format(method))
+
+    def __analyze_by_stat(self):
+        #对于各阶段变异的统计值，过滤出现次数过少的医嘱后，选择排名靠前的医嘱作为推荐医嘱
+        recommend_order_dict = dict() #{"stage_num":set(该阶段更新的医嘱代码)}
+        for stage_num in self.variation["stages"]:
+            var_info = self.variation["stages"][stage_num]
+            #取新增变异中，排名前10的变异医嘱：
+            sort_newadd_var_order =  sorted(var_info.newadd_variation.items(), key=lambda x: x[1],reverse=True)
+            for item in sort_newadd_var_order:
+                if item[1] < 3 or sort_newadd_var_order.index(item) >= 10:
+                    break
+                if stage_num not in recommend_order_dict:
+                    recommend_order_dict[stage_num] = dict()
+                recommend_order_dict[stage_num][item[0]] = item[1]
+        return recommend_order_dict
 
     def show_var_info(self):
         # count = 0
+        print("var visits count:{}".format(self.variation["cp"]["visits_count"]))
         for stage_num in self.cp.stage:
             variation = self.variation["stages"][stage_num]
             print("阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{}".format(
@@ -158,15 +193,24 @@ if __name__ == "__main__":
 
     anlyzer = CP_Analyzer(input_cp,input_visits)
     anlyzer.analyze_visits()
-    # anlyzer.show_var_info()
-    print(len(Orders_Dict.orders_dict))
-    anlyzer.show_var_info_of_visit("2774502")
+    anlyzer.show_var_info()
+    # print(len(Orders_Dict.orders_dict))
+    # anlyzer.show_var_info_of_visit("2774502")
+    recommend_order = anlyzer.generate_recommendation()
+    for key in recommend_order:
+        print("stage:{},    {}".format(key,recommend_order[key]))
+        print("stage:{},    {}".format(key,dict([(Orders_Dict.orders_dict[x].order_name,recommend_order[key][x]) for x in recommend_order[key]])))
 
-    #
-    # var_list = []
-    # for visit in input_visits.all_visits_dict.values():
-    #     variation = get_variation_of_visit(input_cp, visit)
-    #     var_list.append(variation)
-    # stat_var = count_var(var_list)
-    # cp = update_var_info_of_cp(input_cp,stat_var)
+    comp_cp = input_cp
+    comp_cp.stage["1"].add_orders("G11-555")
+    comp_cp.stage["2"].add_orders("G06-220")
+    comp_cp.stage["3"].add_orders("G11-51703")
+    comp_cp.stage["4"].add_orders("G11-51703")
+    comp_anly = CP_Analyzer(comp_cp,input_visits)
+    comp_anly.analyze_visits()
+    comp_anly.show_var_info()
+    recommend_order = comp_anly.generate_recommendation()
+    for key in recommend_order:
+        print("stage:{},    {}".format(key,recommend_order[key]))
+        print("stage:{},    {}".format(key,dict([(Orders_Dict.orders_dict[x].order_name,recommend_order[key][x]) for x in recommend_order[key]])))
 
