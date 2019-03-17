@@ -125,7 +125,7 @@ class CP_Analyzer(object):
                 self.variation["stages"][x].update_newadd_num()
 
     def generate_recommendation(self):
-        #TODO 生成临床路径的更新建议，即每个阶段添加的医嘱集合
+        #TODO 生成临床路径的更新建议，即每个阶段添加的医嘱集合,
         pass
 
     def show_var_info(self):
@@ -136,6 +136,21 @@ class CP_Analyzer(object):
                 stage_num,variation.variation_num,variation.newadd_variation_num,variation.noselect_variation_num))
             print(variation.newadd_variation)
             print(variation.noselect_variation)
+        #{"day_variation":dict(),"day_stage_map":dict()}
+
+    def show_var_info_of_visit(self,visit_id):
+        if visit_id not in self.visits.all_visits_dict:
+            print("ERROR:input visit_id {} is invalid.".format(visit_id))
+            return
+        print("visit_id:{}".format(visit_id))
+        print("每天异常:")
+        for item in self.variation["visits"][visit_id]["day_variation"]:
+            print("{}:{}".format(item,",".join(self.variation["visits"][visit_id]["day_variation"][item])))
+        print("每天阶段:")
+        for item in self.variation["visits"][visit_id]["day_stage_map"]:
+            value = self.variation["visits"][visit_id]["day_stage_map"][item]
+            l = list(range(value[0],value[1]+1))
+            print("{}:{}".format(item,",".join([str(x) for x in l])))
 
 if __name__ == "__main__":
     input_cp = Clinical_Pathway("4,621",3)
@@ -143,8 +158,9 @@ if __name__ == "__main__":
 
     anlyzer = CP_Analyzer(input_cp,input_visits)
     anlyzer.analyze_visits()
-    anlyzer.show_var_info()
+    # anlyzer.show_var_info()
     print(len(Orders_Dict.orders_dict))
+    anlyzer.show_var_info_of_visit("2774502")
 
     #
     # var_list = []
