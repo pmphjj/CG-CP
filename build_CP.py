@@ -27,6 +27,7 @@ class Clinical_Pathway(object):
         self.stage_nums = 0
 
         self.stage = dict()
+        self.required_order_dict = dict()
 
         # 读取数据库,建立连接
         with open(db_config_path, "r") as f:
@@ -34,7 +35,7 @@ class Clinical_Pathway(object):
         self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
 
         self.__build_cp__()
-
+        self.show_info()
         self.conn.close()
         return
 
@@ -69,6 +70,16 @@ class Clinical_Pathway(object):
 
         return CP_str
 
+    def update_required_order_dict(self):
+        #TODO 更新必选词表
+        pass
+
+    def show_info(self):
+        #展示类的基本信息
+        print("cp_id:"+self.cp_id)
+        print("cp_name:"+self.cp_name)
+        print("stage_nums:"+str(self.stage_nums))
+        print(self.__str__())
 
     def get_stage_code(self,x):
         """
@@ -76,23 +87,25 @@ class Clinical_Pathway(object):
         :param x:
         :return:
         """
+        x = str(x)
         if x not in self.stage:
-            print("ERROR: input stage number is invalid.")
+            print("ERROR: input stage number {} is invalid.".format(x))
             return
         return self.stage[x].stage_item_codes_set
 
-    def add_variation_to_stage(self,var_code_set,x):
-        """
-        向阶段中添加变异
-        :param var_code_set: 变异医嘱的编码set集合
-        :param x: 临床路径阶段序号
-        :return:
-        """
-        if x not in self.stage:
-            print("ERROR: input stage number is invalid.")
-            return
-        for order_code in var_code_set:
-            self.stage[x].add_variation(order_code)
+    # def add_variation_to_stage(self,var_code_set,x):
+    #     """
+    #     向阶段中添加变异
+    #     :param var_code_set: 变异医嘱的编码set集合
+    #     :param x: 临床路径阶段序号
+    #     :return:
+    #     """
+    #     x = str(x)
+    #     if x not in self.stage:
+    #         print("ERROR: input stage number {} is invalid.".format(x))
+    #         return
+    #     for order_code in var_code_set:
+    #         self.stage[x].add_variation(order_code)
 
 
 class Stages(object):
@@ -125,7 +138,7 @@ class Stages(object):
 
         self.stage_item_codes_set = set()
         self.stage_orders_detail = dict()
-        self.stage_variation = CP_Variation()
+        # self.stage_variation = CP_Variation()
 
         # 获取该阶段的药物codes
         cp_orders = pd.read_sql_query(
@@ -147,22 +160,21 @@ class Stages(object):
         return
 
 
-    def add_variation(self, order_code):
-        '''
-            添加异常，若order_code在stage_item_codes_set中出现，则说明是必选项未选异常，否则为新增异常
-        :param order_code: 
-        :return: 
-        '''
-
-        if order_code in self.stage_item_codes_set:
-            # 必选项未选异常
-            self.stage_variation.noselect_variation[order_code] += 1
-            self.stage_variation.update_noselect_num()
-        else:
-            # 新增异常
-            self.stage_variation.newadd_variation[order_code] += 1
-            self.stage_variation.update_newadd_num()
-
+    # def add_variation(self, order_code):
+    #     '''
+    #         添加异常，若order_code在stage_item_codes_set中出现，则说明是必选项未选异常，否则为新增异常
+    #     :param order_code:
+    #     :return:
+    #     '''
+    #
+    #     if order_code in self.stage_item_codes_set:
+    #         # 必选项未选异常
+    #         self.stage_variation.noselect_variation[order_code] += 1
+    #         self.stage_variation.update_noselect_num()
+    #     else:
+    #         # 新增异常
+    #         self.stage_variation.newadd_variation[order_code] += 1
+    #         self.stage_variation.update_newadd_num()
 
     def add_orders(self, order_code):
         '''

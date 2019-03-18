@@ -26,7 +26,9 @@ class Build_Visist_Order(object):
         with open(db_config_path, "r") as f:
             self.db_config = json.loads(f.read())
         self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
-
+        self.__build_visits_info__()
+        self.show_info()
+        self.conn.close()
 
     def __build_visits_info__(self):
         '''
@@ -47,6 +49,13 @@ class Build_Visist_Order(object):
                 self.all_visits_dict[visit_id] = new_visit
             else:
                 print("ERROR: Exists visit")
+
+    def show_info(self):
+        #展示类的基本信息
+        print("cp_id:"+self.cp_id)
+        print("version_sqno:"+str(self.version_sqno))
+        print("order_table_name:"+self.order_table_name)
+        print("visits amount:"+str(len(self.all_visits_dict)))
 
 
 class Visit(object):
@@ -71,13 +80,13 @@ class Visit(object):
             day_orders = day_info[1]    #DataFrame
 
             day_list = []
-            order_columns = day_info.columns.values.tolist()
+            order_columns = day_orders.columns.values.tolist()
 
             # 将这一天中的每一个医嘱变为dict,并存入day_list中
-            for order in day_info.iterrows():
+            for order in day_orders.iterrows():
 
                 # 将一个医嘱信息变为dict
-                order_dict = dict([(k, day_info[1][k]) for k in order_columns])
+                order_dict = dict([(k,order[1][k]) for k in order_columns])
                 day_list.append(order_dict)
 
                 # 将医嘱信息添加进入医嘱字典
