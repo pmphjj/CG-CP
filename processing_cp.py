@@ -46,7 +46,7 @@ class CP_Analyzer(object):
         max_stage_num = self.cp.stage_nums
         #天-阶段映射列表，列表下标为天序号，值为该天的阶段范围(起始阶段，终止阶段)
         day_stage_map = dict()
-        #阶段-历史医嘱dict {阶段序号：set(该阶段历史医嘱代码)}
+        #阶段-历史医嘱dict {阶段序号：set(该阶段历史医嘱代码)} 用于必选医嘱没选的检查
         stage_order_dict = dict([(x,set()) for x in range(1,max_stage_num+1)])
 
         #划分阶段 ，暂不考虑路径定义的阶段长度与具体执行日期间的差异
@@ -75,7 +75,7 @@ class CP_Analyzer(object):
                     else:
                         break
 
-            #若当天剩余医嘱集day_item_code_set不为空，则将其加入到当天的首个阶段cur_stage_num的变异记录中
+            #若当天剩余医嘱集day_item_code_set不为空，则将其加入到当天的首个阶段cur_stage_num的变异记录中【需要重点注意】
             if len(day_item_code_set) > 0:
                 stat_var["day"][day_time] = day_item_code_set
                 stat_var["stage"][cur_stage_num] = stat_var["stage"].setdefault(cur_stage_num,set()).union(day_item_code_set)
@@ -83,6 +83,7 @@ class CP_Analyzer(object):
             day_stage_map[day_time] = (cur_stage_num,temp_stage_num)
             cur_stage_num = temp_stage_num
         stat_var["day_stage_map"] = day_stage_map
+
         #依据天-阶段的对应关系，搜索必选没选的变异医嘱 需要CP类提供一个required_order_dict {阶段序号：set(该阶段必需的医嘱代码)}
         for stage_num in self.cp.required_order_dict:
             required_set = self.cp.required_order_dict[stage_num]
@@ -165,7 +166,7 @@ class CP_Analyzer(object):
     def show_var_info(self):
         # count = 0
         print("var visits count:{}".format(self.variation["cp"]["visits_count"]))
-        for stage_num in self.cp.stage:
+        for stage_num in sorted(self.cp.stage, key = lambda x: x[0]):
             variation = self.variation["stages"][stage_num]
             print("阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{}".format(
                 stage_num,variation.variation_num,variation.newadd_variation_num,variation.noselect_variation_num))
@@ -187,6 +188,13 @@ class CP_Analyzer(object):
             l = list(range(value[0],value[1]+1))
             print("{}:{}".format(item,",".join([str(x) for x in l])))
 
+
+    def show_recommend(self, recommend_order):
+        for key in sorted(recommend_order.keys()):
+            print("stage:{},    {}".format(key, sorted( [(k,v) for k,v in recommend_order[key].items()], key=lambda x:x[1], reverse=True)))
+            recommend_order_name = [(Orders_Dict.orders_dict[x].order_name, recommend_order[key][x]) for x in recommend_order[key]]
+            print("stage:{},    {}".format(key, sorted(recommend_order_name, key=lambda x:x[1], reverse=True)))
+
 if __name__ == "__main__":
     input_cp = Clinical_Pathway("4,621",3)
     input_visits = Build_Visist_Order("4,621",3)
@@ -196,11 +204,13 @@ if __name__ == "__main__":
     anlyzer.show_var_info()
     # print(len(Orders_Dict.orders_dict))
     # anlyzer.show_var_info_of_visit("2774502")
-    recommend_order = anlyzer.generate_recommendation()
-    for key in recommend_order:
-        print("stage:{},    {}".format(key,recommend_order[key]))
-        print("stage:{},    {}".format(key,dict([(Orders_Dict.orders_dict[x].order_name,recommend_order[key][x]) for x in recommend_order[key]])))
 
+
+    print("\n+++++++++++++++++++++ CP Recommend Orders +++++++++++++++++++++++++++++")
+    recommend_order = anlyzer.generate_recommendation()
+    anlyzer.show_recommend(recommend_order)
+
+    print("\n+++++++++++++++++++++ New Clinical Pathway +++++++++++++++++++++++++++++")
     comp_cp = input_cp
     comp_cp.stage["1"].add_orders("G11-555")
     comp_cp.stage["2"].add_orders("G06-220")
@@ -210,7 +220,4 @@ if __name__ == "__main__":
     comp_anly.analyze_visits()
     comp_anly.show_var_info()
     recommend_order = comp_anly.generate_recommendation()
-    for key in recommend_order:
-        print("stage:{},    {}".format(key,recommend_order[key]))
-        print("stage:{},    {}".format(key,dict([(Orders_Dict.orders_dict[x].order_name,recommend_order[key][x]) for x in recommend_order[key]])))
-
+    comp_anly.show_recommend(recommend_order)

@@ -224,7 +224,6 @@ class CP_Variation(object):
         self.newadd_variation = defaultdict(int)
         self.noselect_variation = defaultdict(int)
 
-
     def update_newadd_num(self):
         self.newadd_variation_num += 1
         self.variation_num += 1

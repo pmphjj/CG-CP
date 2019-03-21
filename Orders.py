@@ -11,7 +11,6 @@ class Orders_Dict(object):
         :return: 
         '''
 
-
         if order_info["CLINIC_ITEM_CODE"] in Orders_Dict.orders_dict:
             return
         else:
