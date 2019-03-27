@@ -2,6 +2,7 @@
 from build_CP import Clinical_Pathway,Stages,CP_Variation
 from Build_visits import Build_Visist_Order
 from Orders import Orders_Dict
+import operate
 
 
 class CP_Analyzer(object):
@@ -188,12 +189,43 @@ class CP_Analyzer(object):
             l = list(range(value[0],value[1]+1))
             print("{}:{}".format(item,",".join([str(x) for x in l])))
 
-
     def show_recommend(self, recommend_order):
         for key in sorted(recommend_order.keys()):
             print("stage:{},    {}".format(key, sorted( [(k,v) for k,v in recommend_order[key].items()], key=lambda x:x[1], reverse=True)))
             recommend_order_name = [(Orders_Dict.orders_dict[x].order_name, recommend_order[key][x]) for x in recommend_order[key]]
             print("stage:{},    {}".format(key, sorted(recommend_order_name, key=lambda x:x[1], reverse=True)))
+
+    def get_each_stage_visits_variation(self):
+        """
+            处理self.variation["visits"]的所有visits
+            每一个visits的结构为 {"day_variation":dict(),"day_stage_map":dict()}
+            获取该分析器中每一个阶段内不同visit的变异情况，返回类型如下：
+            dict{
+                "1" --> [ [Visit1_variation_orders_sequence], [Visit2_variation_orders_sequence], ... , ], # Stage1
+                "2" --> [ [Visit1_variation_orders_sequence], [Visit2_variation_orders_sequence], ... , ], # Stage2
+                "3" --> [ [Visit1_variation_orders_sequence], [Visit2_variation_orders_sequence], ... , ], # Stage3
+                ...
+            }
+            
+        :return: 
+        BY： Wayne
+        """
+
+        visits_variation = dict([ (stage_num+1, []) for stage_num in range(self.cp.stage_nums) ])
+
+        # for visit_id in ["2726954", "3216993"]:
+        for visit_id in self.visits.all_visits_dict.keys():
+            temp_variation = dict([ (stage_num+1, set()) for stage_num in range(self.cp.stage_nums) ])
+            visit_item = self.variation['visits'][visit_id]
+            for date, day_item in visit_item["day_variation"].items():
+                stage = visit_item["day_stage_map"][date][0]
+                temp_variation[stage] = ( temp_variation[stage].union(day_item) )
+                # print(stage, temp_variation[stage] , "\n")
+
+            for stage, stage_items in temp_variation.items():
+                visits_variation[stage].append(list(stage_items))
+        return visits_variation
+
 
 if __name__ == "__main__":
     input_cp = Clinical_Pathway("4,621",3)
@@ -202,22 +234,42 @@ if __name__ == "__main__":
     anlyzer = CP_Analyzer(input_cp,input_visits)
     anlyzer.analyze_visits()
     anlyzer.show_var_info()
-    # print(len(Orders_Dict.orders_dict))
-    # anlyzer.show_var_info_of_visit("2774502")
-
-
-    print("\n+++++++++++++++++++++ CP Recommend Orders +++++++++++++++++++++++++++++")
     recommend_order = anlyzer.generate_recommendation()
     anlyzer.show_recommend(recommend_order)
 
-    print("\n+++++++++++++++++++++ New Clinical Pathway +++++++++++++++++++++++++++++")
+    print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
+    # 找到每一个visit每一个阶段的变异，以及每一个阶段的频繁项集
+    visit_variation = anlyzer.get_each_stage_visits_variation()
+    stage_frequent = operate.get_all_stage_frequent_pattern(visit_variation,0.05)
+
+    # 找到每一个阶段最佳新增医嘱
+    operate.update_CP(input_cp, input_visits, anlyzer, stage_frequent)
+
+    print("+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++\n")
+
     comp_cp = input_cp
-    comp_cp.stage["1"].add_orders("G11-555")
-    comp_cp.stage["2"].add_orders("G06-220")
-    comp_cp.stage["3"].add_orders("G11-51703")
-    comp_cp.stage["4"].add_orders("G11-51703")
-    comp_anly = CP_Analyzer(comp_cp,input_visits)
+    comp_cp.stage["3"].add_orders("G11-555")
+    comp_anly = CP_Analyzer(comp_cp, input_visits)
     comp_anly.analyze_visits()
+    operate.evaluation(anlyzer, comp_anly, 3)
     comp_anly.show_var_info()
-    recommend_order = comp_anly.generate_recommendation()
-    comp_anly.show_recommend(recommend_order)
+
+
+    # 添加新的医嘱，创建新的临床路径
+    # print("\n+++++++++++++++++++++ CP Recommend Orders +++++++++++++++++++++++++++++")
+    # recommend_order = anlyzer.generate_recommendation()
+    # anlyzer.show_recommend(recommend_order)
+    #
+    # print("\n+++++++++++++++++++++ New Clinical Pathway +++++++++++++++++++++++++++++")
+    # comp_cp = input_cp
+    # comp_cp.stage["1"].add_orders("G11-555")
+    # comp_cp.stage["1"].add_orders("G06-220")
+    # comp_cp.stage["1"].add_orders("U76-100")
+    # comp_cp.stage["2"].add_orders("F04-013")
+    # comp_cp.stage["3"].add_orders("G11-51703")
+    # comp_cp.stage["4"].add_orders("G11-51703")
+    # comp_anly = CP_Analyzer(comp_cp,input_visits)
+    # comp_anly.analyze_visits()
+    # comp_anly.show_var_info()
+    # recommend_order = comp_anly.generate_recommendation()
+    # comp_anly.show_recommend(recommend_order)
