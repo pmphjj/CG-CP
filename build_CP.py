@@ -93,20 +93,6 @@ class Clinical_Pathway(object):
             return
         return self.stage[x].stage_item_codes_set
 
-    # def add_variation_to_stage(self,var_code_set,x):
-    #     """
-    #     向阶段中添加变异
-    #     :param var_code_set: 变异医嘱的编码set集合
-    #     :param x: 临床路径阶段序号
-    #     :return:
-    #     """
-    #     x = str(x)
-    #     if x not in self.stage:
-    #         print("ERROR: input stage number {} is invalid.".format(x))
-    #         return
-    #     for order_code in var_code_set:
-    #         self.stage[x].add_variation(order_code)
-
 
 class Stages(object):
     def __init__(self, cp_id, version_sqno, stage_info, conn):
@@ -158,23 +144,6 @@ class Stages(object):
             Orders.Orders_Dict.add_orders(each_order_dict)
 
         return
-
-
-    # def add_variation(self, order_code):
-    #     '''
-    #         添加异常，若order_code在stage_item_codes_set中出现，则说明是必选项未选异常，否则为新增异常
-    #     :param order_code:
-    #     :return:
-    #     '''
-    #
-    #     if order_code in self.stage_item_codes_set:
-    #         # 必选项未选异常
-    #         self.stage_variation.noselect_variation[order_code] += 1
-    #         self.stage_variation.update_noselect_num()
-    #     else:
-    #         # 新增异常
-    #         self.stage_variation.newadd_variation[order_code] += 1
-    #         self.stage_variation.update_newadd_num()
 
     def add_orders(self, order_code):
         '''
