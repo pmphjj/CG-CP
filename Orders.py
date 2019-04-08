@@ -31,6 +31,8 @@ class Basic_Order_Info(object):
         '''
             医嘱类，包含医嘱的基本信息
         :param order:医嘱的具体信息, 是一个dict格式
+        
+            (新增该医嘱是否是必选项，药物剂量等)
 
             包含的参数有：
             order_class
@@ -42,6 +44,7 @@ class Basic_Order_Info(object):
         self.order_class = order["ORDER_CLASS"]
         self.clinic_item_code = order["CLINIC_ITEM_CODE"]
         self.order_name = order["ORDER_NAME"]
+        self.order_amount = order["AMOUNT"]
 
         return
 
