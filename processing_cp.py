@@ -397,11 +397,10 @@ if __name__ == "__main__":
     anlyzer.analyze_visits()
     anlyzer.show_var_info()
 
-    # new_variation = anlyzer.get_newCP_variation(input_cp)
-    # anlyzer.show_var_info(new_variation)
+    new_variation = anlyzer.get_newCP_variation(input_cp)
+    anlyzer.show_var_info(new_variation)
 
     print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
-
     # 获取推荐的医嘱集
     threshold = 0.05    # 变异项出现的频率
     most_count = 2  # 对每一阶段，最多推荐新增医嘱数目

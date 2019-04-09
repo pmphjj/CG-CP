@@ -109,10 +109,10 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
             # comp_anly = CP_Analyzer(new_cp, input_visits)
             # comp_anly.analyze_visits()
 
-            new_variaiont = cp1_analyzer.get_newCP_variation(new_cp)
+            new_variation = cp1_analyzer.get_newCP_variation(new_cp)
 
             # change_variation =  evaluation(cp1_analyzer.variation, new_variaiont, stage)
-            change_variation = evaluation(old_variation, new_variaiont, stage)
+            change_variation = evaluation(old_variation, new_variation, stage)
             print("阶段：{}，增加的异常为{}，改变的异常数为{}".format(stage, items, change_variation))
 
             if change_variation > best_score:
