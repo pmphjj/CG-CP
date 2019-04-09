@@ -136,23 +136,27 @@ class CP_Analyzer(object):
                 self.variation["stages"][x].newadd_variation[order_code] += 1
                 self.variation["stages"][x].update_newadd_num()
 
-    def generate_recommendation(self,method="statistics"):
+    def generate_recommendation(self, method="statistics", threshold=0.05, most_count=2):
         """
         生成临床路径的更新建议，即每个阶段添加的医嘱集合
         :param method: 产生更新的方法。
             "statistics": 默认选择，基于统计值的方法。
         :return: 每个阶段添加的医嘱集合
+            dict()格式
+            stage_num ---> ['G06-220', 'G11-503', 'G11-555', 'U76-100', 'U76-K01']
         """
         if method == "statistics":
             return self.__analyze_by_stat()
         elif method == "fpgrowth":
-            return self.__analyze_by_fpgrowth()
+            return self.__analyze_by_fpgrowth(threshold=0.05, most_count=3)
         else:
             print("ERROR:No method : {}.".format(method))
 
     def __analyze_by_stat(self):
         '''
         :return: 对于各阶段变异的统计值，过滤出现次数过少的医嘱后，选择排名靠前的医嘱作为推荐医嘱
+            dict()格式
+            stage_num ---> ['G06-220', 'G11-503', 'G11-555', 'U76-100', 'U76-K01']
         '''
         recommend_order_dict = dict()       #{"stage_num":set(该阶段更新的医嘱代码)}
         for stage_num in self.variation["stages"]:
@@ -165,9 +169,14 @@ class CP_Analyzer(object):
                 if stage_num not in recommend_order_dict:
                     recommend_order_dict[stage_num] = dict()
                 recommend_order_dict[stage_num][item[0]] = item[1]
+
+            # 新增 BY:Wayne, 修改返回格式
+            if stage_num in recommend_order_dict:
+                recommend_order_dict[stage_num] = recommend_order_dict[stage_num].keys()
+
         return recommend_order_dict
 
-    def __analyze_by_fpgrowth(self, threshold=0.05):
+    def __analyze_by_fpgrowth(self, threshold=0.05, most_count=2):
         """
             使用频繁模式挖掘算法，等到推荐的医嘱集合
         :return: 返回的格式为:
@@ -176,7 +185,7 @@ class CP_Analyzer(object):
         """
 
         visit_variation = anlyzer.get_each_stage_visits_variation()
-        stage_frequent = operate.get_all_stage_frequent_pattern(visit_variation, threshold)
+        stage_frequent = operate.get_all_stage_frequent_pattern(visit_variation, threshold, most_count)
 
         recommend_order_dict = operate.selected_recomend_orders(input_cp, input_visits, anlyzer, stage_frequent)
 
@@ -209,8 +218,10 @@ class CP_Analyzer(object):
 
     def show_recommend(self, recommend_order):
         for key in sorted(recommend_order.keys()):
-            print("stage:{},    {}".format(key, sorted( [(k,v) for k,v in recommend_order[key].items()], key=lambda x:x[1], reverse=True)))
-            recommend_order_name = [(Orders_Dict.orders_dict[x].order_name, recommend_order[key][x]) for x in recommend_order[key]]
+            order_list = list(recommend_order[key])
+            print("stage:{},    {}".format(key, order_list))
+
+            recommend_order_name = [(Orders_Dict.orders_dict[order_list[x]].order_name, order_list[x]) for x in range(len(order_list))]
             print("stage:{},    {}".format(key, sorted(recommend_order_name, key=lambda x:x[1], reverse=True)))
 
     def get_each_stage_visits_variation(self):
@@ -253,10 +264,19 @@ if __name__ == "__main__":
     anlyzer.analyze_visits()
     anlyzer.show_var_info()
 
-    recommend_order = anlyzer.generate_recommendation()
+    print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
+
+    # 获取推荐的医嘱集
+    threshold = 0.05    # 变异项出现的频率
+    most_count = 2  # 对每一阶段，最多推荐新增医嘱数目
+    recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)
+    print("\n推荐更新:")
     anlyzer.show_recommend(recommend_order)
 
+    # 将推荐的医嘱集加入临床路径并比较
+    operate.add_orders_and_show(input_cp, input_visits, anlyzer, recommend_order)
 
+    print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
 
     # print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
     # # 找到每一个visit每一个阶段的变异，以及每一个阶段的频繁项集
