@@ -32,6 +32,65 @@ class CP_Analyzer(object):
             visits_v[visit_id] = {"day_variation":dict(),"day_stage_map":dict()}
         self.variation = {"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v}
 
+    def get_stage_by_split_visit(self, input_visit):
+        """
+        获取输入的visit的天与阶段的映射表
+        :param input_visit: Visit类
+        :return: 天与阶段的映射表{ "天序号":[起始阶段，终止阶段]}
+        """
+        sort_visit_order_list = sorted(input_visit.day_level_info.items(), key=lambda x: x[0])
+        cur_stage_num = 1
+        max_stage_num = self.cp.stage_nums
+        # 天-阶段映射列表，列表下标为天序号，值为该天的阶段范围(起始阶段，终止阶段)
+        day_stage_map = dict()
+
+        # 划分阶段 ，暂不考虑路径定义的阶段长度与具体执行日期间的差异
+        for day_order in sort_visit_order_list:
+            day_time = day_order[0]
+            temp_stage_num = cur_stage_num
+            # 获取当天医嘱的编码集合
+            day_item_code_set = set([x["CLINIC_ITEM_CODE"] for x in day_order[1]])
+            while len(day_item_code_set) > 0 and temp_stage_num <= max_stage_num:
+                temp_stage_code_set = self.cp.get_stage_code(temp_stage_num)
+                # 取当天剩余医嘱与当前阶段的交集
+                intersec_set = day_item_code_set.intersection(temp_stage_code_set)
+                # 若当天剩余医嘱与当前阶段有交集，取其差集
+                if len(intersec_set) > 0:
+                    day_item_code_set = day_item_code_set.difference(intersec_set)
+                else:
+                    # 无交集，且当前阶段已达最大阶段，则退出，temp_stage_num为终止阶段
+                    if temp_stage_num == max_stage_num:
+                        break
+                    # 判断与下一阶段是否有交集，若仍无交集，则视其为变异
+                    temp_next_stage_code_set = self.cp.get_stage_code(temp_stage_num + 1)
+                    next_intersec_set = day_item_code_set.intersection(temp_next_stage_code_set)
+                    if len(next_intersec_set) > 0:
+                        #将需要判断与下一阶段相交集的部分是否是当前阶段的变异:下一天包含当前阶段的医嘱多余next_intersec_set中的医嘱
+                        next_index = sort_visit_order_list.index(day_order)+1
+                        if next_index < len(sort_visit_order_list) :
+                            next_day_order_set = set([x["CLINIC_ITEM_CODE"] for x in sort_visit_order_list[next_index][1]])
+                            next_day_order_set = next_day_order_set.difference(temp_next_stage_code_set)
+                            next_day_order_set = next_day_order_set.intersection(temp_stage_code_set)
+                            if len(next_intersec_set) >= len(next_day_order_set):
+                                day_item_code_set = day_item_code_set.difference(temp_next_stage_code_set)
+                                temp_stage_num += 1
+                            else:
+                                day_item_code_set = day_item_code_set.difference(next_intersec_set)
+
+                        else:
+                            day_item_code_set = day_item_code_set.difference(temp_next_stage_code_set)
+                            temp_stage_num += 1
+                    else:
+                        #剩余医嘱与下一阶段无交集，则视其为变异，退出，temp_stage_num为终止阶段
+                        break
+
+            day_stage_map[day_time] = (cur_stage_num, temp_stage_num)
+            cur_stage_num = temp_stage_num
+
+        return day_stage_map
+
+
+
     def get_variation_of_visit(self, input_visit):
         """ 获取一个visit的变异情况
             变异情况分为两类：
@@ -98,7 +157,13 @@ class CP_Analyzer(object):
     def analyze_visits(self):
         self.__init_variation()
         for visit in self.visits.all_visits_dict.values():
+            print("visit_id:"+visit.visit_id)
             stat_var = self.get_variation_of_visit(visit)
+            print(stat_var["day_stage_map"])
+            day_stage_map = self.get_stage_by_split_visit(visit)
+            print(day_stage_map)
+            print("################################################################")
+
             self.__update_variation_info(stat_var,visit.visit_id)
 
     def __update_variation_info(self,stat_var,visit_id):
