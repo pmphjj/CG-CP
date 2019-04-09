@@ -190,8 +190,11 @@ class CP_Variation(object):
         self.variation_num = 0
         self.newadd_variation_num = 0
         self.noselect_variation_num = 0
+        self.dosage_variation_num = 0
+
         self.newadd_variation = defaultdict(int)
         self.noselect_variation = defaultdict(int)
+        self.dosage_variation = defaultdict(int)
 
     def update_newadd_num(self):
         self.newadd_variation_num += 1
@@ -199,6 +202,10 @@ class CP_Variation(object):
 
     def update_noselect_num(self):
         self.noselect_variation_num += 1
+        self.variation_num += 1
+
+    def update_dosage_num(self):
+        self.dosage_variation_num += 1
         self.variation_num += 1
 
 if __name__ == "__main__":
