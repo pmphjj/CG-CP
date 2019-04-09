@@ -38,7 +38,7 @@ def fp_growth(items, supported=0.5):
 
     return sorted(patterns.items(), key=lambda x: x[1], reverse = True)
 
-def get_all_stage_frequent_pattern(visits_variation, supported=0.5):
+def get_all_stage_frequent_pattern(visits_variation, supported=0.5, most_count=5):
     """
         获取每一个阶段的频繁模式
     :param visits_variation: dict{
@@ -47,6 +47,8 @@ def get_all_stage_frequent_pattern(visits_variation, supported=0.5):
                 "3" --> [ [Visit1_variation_orders_sequence], [Visit2_variation_orders_sequence], ... , ], # Stage3
                 ...
             }
+    :param 支持度; num(异常子项) / num(异常项)
+    :param 子项最多医嘱数; 新增的医嘱项最多包含医嘱的数目，默认为5个
     :return: 返回一个dict的结果，stage_num --> list[tuple( (医嘱code频繁项), 频繁项出现次数)), tuple( (医嘱code频繁项), 频繁项出现次数))]
     1 -->  [(('G11-555',), 20), (('U76-100',), 11), (('G11-555', 'U76-100'), 10), (('G11-503',), 9)]
     """
@@ -56,6 +58,13 @@ def get_all_stage_frequent_pattern(visits_variation, supported=0.5):
     for stage, items in visits_variation.items():
         frequent_patterns[stage] = fp_growth(items, supported)
 
+    for key, value in frequent_patterns.items():
+        index = 0
+        while index < len(value):
+            if len(value[index][0]) > most_count:
+                value.pop(index)
+            else:
+                index += 1
     return frequent_patterns
 
 def evaluation(cp1_analyzer, cp2_analyzer, stage):
@@ -112,7 +121,7 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
 
     # 更新每一个阶段的最优方案进临床路径
     for stage, items in best.items():
-        print(stage, [ (item, Orders_Dict.orders_dict[item].order_name) for item in items] )
+        # print(stage, [ (item, Orders_Dict.orders_dict[item].order_name) for item in items] )
         for item in items:
             new_cp.stage[str(stage)].add_orders(item)
 
@@ -124,7 +133,7 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
 
 def calculate_stage_variation_(stage_list, cp, day_orders):
     """
-        获取某一天对应阶段的3中变异情况，新增变异，必选项未选变异以及剂量变异
+        获取某一天对应阶段的3种变异情况，新增变异，必选项未选变异以及剂量变异
     :param stage_list: 该天对应的阶段list，变异加入该天对应的第一个阶段
     :param cp: 模板的临床路径类
     :param day_orders: 这一天的用药情况，输入的是一个 list[], 里面存放的是每一个医嘱的详细信息dict格式, 样例如下
@@ -135,9 +144,14 @@ def calculate_stage_variation_(stage_list, cp, day_orders):
         后面3个参数都是set()
     """
 
-    # 空类可以表示为一个结构体
+    # 表示为一个结构体
+    # 该结构体有4个变量，分别是stage_num, newadd_variation, noselect_variation, dosage_variation
     class Stage_variation():
-        pass
+        def __init__(self):
+            self.stage_num = None
+            self.newadd_variation = None
+            self.noselect_variation = None
+            self.dosage_variation = None
 
     stage_variation = Stage_variation()
     stage_variation.stage_num = min(stage_list)
@@ -190,7 +204,27 @@ def calculate_stage_variation_(stage_list, cp, day_orders):
 
     return stage_variation
 
+def add_orders_and_show(input_cp, input_visits, old_cp_analyzer, recommend_orders):
+    """
+        将推荐的医嘱集加入临床路径并比较
+    :param input_cp: 原始临床路径类
+    :param input_visits: 该病种的所有来访类
+    :param old_cp_analyzer: 原始临床路径的分析类
+    :param recommend_orders: 经过分析得到的推荐医嘱
+    :return: 
+    """
+    comp_cp = copy.deepcopy(input_cp)
 
+    for stage_num, orders in recommend_orders.items():
+        for order in orders:
+            comp_cp.stage[str(stage_num)].add_orders(order)
+
+    comp_anly = CP_Analyzer(comp_cp, input_visits)
+    comp_anly.analyze_visits()
+    # comp_anly.show_var_info()
+
+    print("\n新临床路径与旧路径变异情况比较：")
+    compare_CP(old_cp_analyzer, comp_anly)
 
 
 
