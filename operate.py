@@ -14,14 +14,15 @@ def compare_CP(cp1_variation, cp2_variation, stage_num_list):
     for stage_num in stage_num_list:
         variation1 = cp1_variation["stages"][stage_num]
         variation2 = cp2_variation["stages"][stage_num]
-        print("CP1阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{}".format(
-            stage_num, variation1.variation_num, variation1.newadd_variation_num, variation1.noselect_variation_num))
+        print("CP1阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{}, 剂量变异数:{}".format(
+            stage_num, variation1.variation_num, variation1.newadd_variation_num, variation1.noselect_variation_num, variation1.dosage_variation_num))
 
-        print("CP2阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{}".format(
-            stage_num, variation2.variation_num, variation2.newadd_variation_num, variation2.noselect_variation_num))
+        print("CP2阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{}, 剂量变异数:{}".format(
+            stage_num, variation2.variation_num, variation2.newadd_variation_num, variation2.noselect_variation_num, variation2.dosage_variation_num))
 
-        print("阶段：{}, 总变异数变化:{},  新增变异数变化:{},  必选未选变异数变化:{}".format(
-            stage_num, variation1.variation_num-variation2.variation_num, variation1.newadd_variation_num-variation2.newadd_variation_num, variation1.noselect_variation_num-variation2.noselect_variation_num))
+        print("阶段：{}, 总变异数变化:{},  新增变异数变化:{},  必选未选变异数变化:{}, 剂量变异数变化:{}".format(
+            stage_num, variation1.variation_num-variation2.variation_num, variation1.newadd_variation_num-variation2.newadd_variation_num, variation1.noselect_variation_num-variation2.noselect_variation_num,
+            variation1.dosage_variation_num-variation2.dosage_variation_num))
 
         print("")
 
@@ -113,7 +114,7 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
 
             # change_variation =  evaluation(cp1_analyzer.variation, new_variaiont, stage)
             change_variation = evaluation(old_variation, new_variation, stage)
-            print("阶段：{}，增加的异常为{}，改变的异常数为{}".format(stage, items, change_variation))
+            print("阶段：{}，增加的医嘱为{}，改变的异常数为{}".format(stage, [(item, Orders_Dict.get_orders(item).order_name) for item in items], change_variation))
 
             if change_variation > best_score:
                 best_score = change_variation
@@ -123,7 +124,7 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
             for item in items:
                 new_cp.stage[str(stage)].delete_orders(item)
 
-        print("阶段BEST：{}，增加的异常为{}，改变的异常数为{}\n".format(stage, best_item, best_score))
+        print("阶段BEST：{}，增加的医嘱为{}，改变的异常数为{}\n".format(stage, [(item, Orders_Dict.get_orders(item).order_name) for item in best_item], best_score))
         best[stage].extend(best_item)
 
 
@@ -204,6 +205,10 @@ def calculate_stage_variation(stage_list, cp, day_orders):
             cp_order_detail = cp_orders[order_code]
 
             # cp中定义的剂量为空
+            # 'G11-51703', 'PID025P     1PC', 'PIG012P     1PC'
+            # if order_code == 'G11-51703' or order_code == 'PID025P     1PC' or order_code == 'PIG012P     1PC':
+            #     print("Amount: ", cp_order_detail.order_amount)
+
             if not cp_order_detail.order_amount:
                 continue
             else:
@@ -233,12 +238,12 @@ def add_orders_and_show(input_cp, input_visits, old_cp_analyzer, recommend_order
         for order in orders:
             comp_cp.stage[str(stage_num)].add_orders(order)
 
-    comp_anly = CP_Analyzer(comp_cp, input_visits)
-    comp_anly.analyze_visits()
+    # comp_anly = CP_Analyzer(comp_cp, input_visits)
+    # comp_anly.analyze_visits()
     # comp_anly.show_var_info()
 
     print("\n新临床路径与旧路径变异情况比较：")
-    compare_CP(old_cp_analyzer.variation, comp_anly.variation, sorted(old_cp_analyzer.cp.stage.keys(), key=lambda x:x[0]))
+    compare_CP(old_cp_analyzer.get_newCP_variation(input_cp), old_cp_analyzer.get_newCP_variation(comp_cp), sorted(old_cp_analyzer.cp.stage.keys(), key=lambda x:x[0]))
 
 
 

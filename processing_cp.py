@@ -22,16 +22,79 @@ class CP_Analyzer(object):
         self.cp = input_cp
         self.visits = input_visits
         self.variation = dict()
-        self.visits_info = dict()   # dict: visit_id ---> {"day":dict(),"day_stage_map":dict(),"stage":dict(),"day_level_info":dict()}
+        self.visits_info = dict()   # dict: visit_id ---> {"day_stage_map":dict(),"day_level_info":dict()}
         self.__init_variation()
 
     def __init_variation(self):
-        #初始化变异统计信息
-        stages_v = dict([(x, CP_Variation()) for x in self.cp.stage])
-        visits_v = dict()
-        for visit_id in self.visits.all_visits_dict:
-            visits_v[visit_id] = {"day_variation":dict(),"day_stage_map":dict()}
-        self.variation = {"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v}
+        '''
+            初始化变异统计信息
+            self.visits_info 的结构为 dict: visit_id ---> {"day_stage_map":dict(),"day_level_info":dict()}
+            self.variation 的结构为  {"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v}
+                其中 stages_v = dict: stage_sqno ---> CP_Variation
+                visits = dict: visit_id ---> {"day_variation":dict()【date--->Stage_variation()】, "day_stage_map":dict()【date ---> (start_stage, end_stage)】}
+        :return: 
+        '''
+
+        for visit in self.visits.all_visits_dict.values():
+            stat_var = self.get_visit_info(visit)
+
+            # 往 self.visits_info 加入内容
+            self.visits_info[visit.visit_id] = stat_var
+
+        # 获取异常情况
+        self.variation = self.get_newCP_variation(self.cp)
+
+    def get_visit_info(self, input_visit):
+
+        sort_visit_order_list = sorted(input_visit.day_level_info.items(), key=lambda x: x[0])
+        stat_var = {"day": dict(), "day_stage_map": dict(), "stage": dict([(x, CP_Variation()) for x in self.cp.stage]),
+                    "day_level_info": dict()}
+        cur_stage_num = 1
+        max_stage_num = self.cp.stage_nums
+        # 天-阶段映射列表，列表下标为天序号，值为该天的阶段范围(起始阶段，终止阶段)
+        day_stage_map = dict()
+        # 阶段-历史医嘱dict {阶段序号：set(该阶段历史医嘱代码)} 用于必选医嘱没选的检查
+        stage_order_dict = dict([(x, set()) for x in range(1, max_stage_num + 1)])
+
+        # 划分阶段 ，暂不考虑路径定义的阶段长度与具体执行日期间的差异
+        for day_order in sort_visit_order_list:
+
+            day_time = day_order[0]
+
+            # 获取day_level_info的信息，dict--- day_time: [orders_detail]; BY:Wayne
+            stat_var["day_level_info"][day_time] = day_order[1]
+
+            temp_stage_num = cur_stage_num
+            # 获取当天医嘱的编码集合
+            day_item_code_set = set([x["CLINIC_ITEM_CODE"] for x in day_order[1]])
+            while len(day_item_code_set) > 0 and temp_stage_num <= max_stage_num:
+                temp_stage_code_set = self.cp.get_stage_code(temp_stage_num)
+
+                # 当天剩余医嘱与当前阶段有交集，取其差集
+                intersec_set = day_item_code_set.intersection(temp_stage_code_set)
+                if len(intersec_set) > 0:
+                    stage_order_dict[temp_stage_num] = stage_order_dict[temp_stage_num].union(intersec_set)
+                    day_item_code_set = day_item_code_set.difference(temp_stage_code_set)
+                else:
+                    # 无交集，判断与下一阶段是否有交集，若仍无交集，则视其为变异
+                    if temp_stage_num == max_stage_num:
+                        break
+                    temp_next_stage_code_set = self.cp.get_stage_code(temp_stage_num + 1)
+                    next_intersec_set = day_item_code_set.intersection(temp_next_stage_code_set)
+                    if len(next_intersec_set) > 0:
+                        stage_order_dict[temp_stage_num + 1] = stage_order_dict[temp_stage_num + 1].union(
+                            next_intersec_set)
+                        day_item_code_set = day_item_code_set.difference(temp_next_stage_code_set)
+                        temp_stage_num += 1
+                    else:
+                        break
+
+            day_stage_map[day_time] = (cur_stage_num, temp_stage_num)
+            cur_stage_num = temp_stage_num
+
+        stat_var["day_stage_map"] = day_stage_map
+
+        return stat_var
 
     def get_stage_by_split_visit(self, input_visit):
         """
@@ -90,9 +153,8 @@ class CP_Analyzer(object):
 
         return day_stage_map
 
-
-
     def get_variation_of_visit(self, input_visit):
+
         """ 获取一个visit的变异情况
             变异情况分为两类：
                     1.必选没选
@@ -101,6 +163,7 @@ class CP_Analyzer(object):
         :param input_visit: Visit类
         :return: stat_var, {"day":每天的变异医嘱代码，"day_stage_map":天与阶段的映射表 ,"stage":各阶段的变异情况, "day_level_info":各阶段的医嘱详情【dict格式】}
         """
+
         sort_visit_order_list = sorted(input_visit.day_level_info.items(), key=lambda x: x[0])
         stat_var = {"day":dict(),"day_stage_map":dict(),"stage":dict(),"day_level_info":dict()}
         cur_stage_num = 1
@@ -163,17 +226,17 @@ class CP_Analyzer(object):
     def analyze_visits(self):
         self.__init_variation()
         for visit in self.visits.all_visits_dict.values():
-            print("visit_id:"+visit.visit_id)
-            stat_var = self.get_variation_of_visit(visit)
-            print(stat_var["day_stage_map"])
-            day_stage_map = self.get_stage_by_split_visit(visit)
-            print(day_stage_map)
-            print("################################################################")
 
-            self.__update_variation_info(stat_var,visit.visit_id)
+            # stat_var = self.get_variation_of_visit(visit)
+            # self.__update_variation_info(stat_var,visit.visit_id)
+
+            stat_var = self.get_visit_info(visit)
 
             # 往 self.visits_info 加入内容
             self.visits_info[visit.visit_id] = stat_var
+
+        # 获取异常情况
+        self.variation = self.get_newCP_variation(self.cp)
 
     def get_newCP_variation(self, new_cp):
         """
@@ -190,7 +253,7 @@ class CP_Analyzer(object):
         new_variation = {"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v}
 
         for visit_id, info in self.visits_info.items():
-            #info(dict) visit_id ---> {"day":dict(),"day_stage_map":dict(),"stage":dict(),"day_level_info":dict()}
+            #info(dict): visit_id ---> {"day":dict(),"day_stage_map":dict(),"stage":dict(),"day_level_info":dict()}
 
             new_variation["visits"][visit_id]["day_stage_map"] = info["day_stage_map"]
 
@@ -203,18 +266,21 @@ class CP_Analyzer(object):
 
                 # 更新new_variation的内容，"stages"和"visits"
                 new_variation["visits"][visit_id]["day_variation"][date] = day_variation
+
                 # 更新新增变异
                 if len(day_variation.newadd_variation)!=0:
                     has_Variation = True
                     for order_code in day_variation.newadd_variation:
                         new_variation["stages"][day_variation.stage_num].newadd_variation[order_code] += 1
                         new_variation["stages"][day_variation.stage_num].update_newadd_num()
+
                 # 更新必选项未选变异
                 if len(day_variation.noselect_variation)!=0:
                     has_Variation = True
                     for order_code in day_variation.newadd_variation:
                         new_variation["stages"][day_variation.stage_num].noselect_variation[order_code] += 1
                         new_variation["stages"][day_variation.stage_num].update_noselect_num()
+
                 # 更新剂量变异
                 if len(day_variation.dosage_variation) != 0:
                     has_Variation = True
@@ -275,7 +341,7 @@ class CP_Analyzer(object):
         if method == "statistics":
             return self.__analyze_by_stat()
         elif method == "fpgrowth":
-            return self.__analyze_by_fpgrowth(threshold=0.05, most_count=3)
+            return self.__analyze_by_fpgrowth(threshold=threshold, most_count=most_count)
         else:
             print("ERROR:No method : {}.".format(method))
 
@@ -318,7 +384,6 @@ class CP_Analyzer(object):
 
         return recommend_order_dict
 
-
     def show_var_info(self, all_variation=""):
         # count = 0
 
@@ -329,7 +394,7 @@ class CP_Analyzer(object):
         for stage_num in sorted(self.cp.stage, key = lambda x: x[0]):
             variation = all_variation["stages"][stage_num]
             print("阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{},  剂量变异数:{}".format(
-                stage_num,variation.variation_num,variation.newadd_variation_num,variation.noselect_variation_num, variation.dosage_variation_num))
+                stage_num, variation.variation_num,variation.newadd_variation_num, variation.noselect_variation_num, variation.dosage_variation_num))
             print("新增变异：", [(k,v) for k,v in variation.newadd_variation.items()] )
             print("必选未选变异：", [(k,v) for k,v in variation.noselect_variation.items()])
             print("剂量变异：", [(k,v) for k,v in variation.dosage_variation.items()])
@@ -379,9 +444,14 @@ class CP_Analyzer(object):
         for visit_id in self.visits.all_visits_dict.keys():
             temp_variation = dict([ (stage_num+1, set()) for stage_num in range(self.cp.stage_nums) ])
             visit_item = self.variation['visits'][visit_id]
+
+            # 将剂量异常和新增异常同等考虑处理
+            # day_item 是operate.py文件中的 Stage_Variation类， 包含4个变量stage_num, newadd_variation, noselect_variation, dosage_variation
             for date, day_item in visit_item["day_variation"].items():
-                stage = visit_item["day_stage_map"][date][0]
-                temp_variation[stage] = ( temp_variation[stage].union(day_item) )
+                stage = int(day_item.stage_num)
+                temp_variation[stage] = (temp_variation[stage].union(day_item.newadd_variation) )
+                temp_variation[stage] = (temp_variation[stage].union(day_item.noselect_variation))
+                temp_variation[stage] = (temp_variation[stage].union(day_item.dosage_variation))
                 # print(stage, temp_variation[stage] , "\n")
 
             for stage, stage_items in temp_variation.items():
@@ -394,7 +464,6 @@ if __name__ == "__main__":
     input_visits = Build_Visist_Order("4,621",3)
 
     anlyzer = CP_Analyzer(input_cp,input_visits)
-    anlyzer.analyze_visits()
     anlyzer.show_var_info()
 
     new_variation = anlyzer.get_newCP_variation(input_cp)
@@ -403,8 +472,9 @@ if __name__ == "__main__":
     print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
     # 获取推荐的医嘱集
     threshold = 0.05    # 变异项出现的频率
-    most_count = 2  # 对每一阶段，最多推荐新增医嘱数目
-    recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)
+    most_count = 4      # 对每一阶段，最多推荐新增医嘱数目
+    # recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)
+    recommend_order = anlyzer.generate_recommendation()
     print("\n推荐更新:")
     anlyzer.show_recommend(recommend_order)
 

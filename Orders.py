@@ -1,7 +1,7 @@
-
+from collections import defaultdict
 
 class Orders_Dict(object):
-    orders_dict = dict()    # clinical_item_code ---> Basic_Order_Info
+    orders_dict = dict()    # order_code ---> Basic_Order_Info
 
     @staticmethod
     def add_orders(order_info):
@@ -18,6 +18,12 @@ class Orders_Dict(object):
 
     @staticmethod
     def get_orders(order_code):
+        '''
+            获取某一阶段的某一个医嘱
+        :param order_code: 
+        :param stage_sqno: 
+        :return: 
+        '''
 
         if order_code in Orders_Dict.orders_dict:
             return Orders_Dict.orders_dict[order_code]

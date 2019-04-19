@@ -145,7 +145,7 @@ class Stages(object):
 
         return
 
-    def add_orders(self, order_code):
+    def add_orders(self, order_code, order_amount=None, order_class=None):
         '''
             添加医嘱进该阶段
         :return: 
@@ -155,7 +155,12 @@ class Stages(object):
             print("ERROR: Order has already existed in stage")
         else:
             self.stage_item_codes_set.add(order_code)
-            self.stage_orders_detail[order_code] = Orders.Orders_Dict.get_orders(order_code)
+
+            # 将该医嘱放入对应阶段, 若存在对应医嘱，则修改
+            order_name = Orders.Orders_Dict.get_orders(order_code).order_name
+            order_info = dict({"CLINIC_ITEM_CODE": order_code, "AMOUNT": order_amount, "ORDER_CLASS":order_class, "ORDER_NAME":order_name })
+            self.stage_orders_detail[order_code] = Orders.Basic_Order_Info(order_info)
+
         return
 
     def delete_orders(self, order_code):
