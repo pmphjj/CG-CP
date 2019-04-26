@@ -51,6 +51,12 @@ class Basic_Order_Info(object):
         self.clinic_item_code = order["CLINIC_ITEM_CODE"]
         self.order_name = order["ORDER_NAME"]
         self.order_amount = order["AMOUNT"]
+        self.order_freq = order["FREQ_CODE"] if "FREQ_CODE" in order else None
+        self.order_plan_days = order["PLAN_DAYS"] if "PLAN_DAYS" in order else None
+        self.order_required = order["REQUIRED"] if "REQUIRED" in order else None
 
         return
+
+    def __str__(self):
+        return self.order
 

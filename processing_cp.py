@@ -240,7 +240,7 @@ class CP_Analyzer(object):
 
     def get_newCP_variation(self, new_cp):
         """
-            输入改进的临床路径，输出根据初始化时的映射得到的异常情况
+            输入临床路径，输出根据初始化时的映射得到的异常情况
             返回的是一个new_variation的字典，格式与self.variation一样
             {"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v}
         :param new_cp: 
@@ -267,6 +267,9 @@ class CP_Analyzer(object):
                 # 更新new_variation的内容，"stages"和"visits"
                 new_variation["visits"][visit_id]["day_variation"][date] = day_variation
 
+                # 更新日期对应第一个阶段的总异常
+                new_variation["stages"][day_variation.stage_num].update_variation_num(day_variation.variation_num)
+
                 # 更新新增变异
                 if len(day_variation.newadd_variation)!=0:
                     has_Variation = True
@@ -277,16 +280,30 @@ class CP_Analyzer(object):
                 # 更新必选项未选变异
                 if len(day_variation.noselect_variation)!=0:
                     has_Variation = True
-                    for order_code in day_variation.newadd_variation:
+                    for order_code in day_variation.noselect_variation:
                         new_variation["stages"][day_variation.stage_num].noselect_variation[order_code] += 1
                         new_variation["stages"][day_variation.stage_num].update_noselect_num()
 
                 # 更新剂量变异
                 if len(day_variation.dosage_variation) != 0:
                     has_Variation = True
-                    for order_code in day_variation.newadd_variation:
+                    for order_code in day_variation.dosage_variation:
                         new_variation["stages"][day_variation.stage_num].dosage_variation[order_code] += 1
                         new_variation["stages"][day_variation.stage_num].update_dosage_num()
+
+                # 更新天数变异
+                if len(day_variation.planday_variation) != 0:
+                    has_Variation = True
+                    for order_code in day_variation.planday_variation:
+                        new_variation["stages"][day_variation.stage_num].planday_variation[order_code] += 1
+                        new_variation["stages"][day_variation.stage_num].update_planday_num()
+
+                # 更新频率变异
+                if len(day_variation.dosage_variation) != 0:
+                    has_Variation = True
+                    for order_code in day_variation.freq_variation:
+                        new_variation["stages"][day_variation.stage_num].freq_variation[order_code] += 1
+                        new_variation["stages"][day_variation.stage_num].update_freq_num()
 
             # 更新new_variation的cp，visits_count
             if has_Variation:
@@ -393,11 +410,16 @@ class CP_Analyzer(object):
         print("var visits count:{}".format(all_variation["cp"]["visits_count"]))
         for stage_num in sorted(self.cp.stage, key = lambda x: x[0]):
             variation = all_variation["stages"][stage_num]
-            print("阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{},  剂量变异数:{}".format(
-                stage_num, variation.variation_num,variation.newadd_variation_num, variation.noselect_variation_num, variation.dosage_variation_num))
+            print("阶段：{}, 总变异数:{},  新增变异数:{},  必选未选变异数:{},  剂量变异数:{}, 天数变异数：{}, 频率变异数:{}".format(
+                stage_num, variation.variation_num,variation.newadd_variation_num, variation.noselect_variation_num, variation.dosage_variation_num,
+                variation.planday_variation_num, variation.freq_variation_num))
+
             print("新增变异：", [(k,v) for k,v in variation.newadd_variation.items()] )
             print("必选未选变异：", [(k,v) for k,v in variation.noselect_variation.items()])
             print("剂量变异：", [(k,v) for k,v in variation.dosage_variation.items()])
+            print("天数变异：", [(k, v) for k, v in variation.planday_variation.items()])
+            print("频率变异：", [(k, v) for k, v in variation.freq_variation.items()])
+
             print("")
 
     def show_var_info_of_visit(self,visit_id):
@@ -445,13 +467,16 @@ class CP_Analyzer(object):
             temp_variation = dict([ (stage_num+1, set()) for stage_num in range(self.cp.stage_nums) ])
             visit_item = self.variation['visits'][visit_id]
 
-            # 将剂量异常和新增异常同等考虑处理
-            # day_item 是operate.py文件中的 Stage_Variation类， 包含4个变量stage_num, newadd_variation, noselect_variation, dosage_variation
+            # 将【新增变异、必选项未选变异、剂量变异、天数变异、频率变异】同等考虑处理
+            # day_item 是operate.py文件中的 Stage_Variation类， 包含变量stage_num, newadd_variation, noselect_variation, dosage_variation, planday_variation, freq_variation
             for date, day_item in visit_item["day_variation"].items():
                 stage = int(day_item.stage_num)
                 temp_variation[stage] = (temp_variation[stage].union(day_item.newadd_variation) )
                 temp_variation[stage] = (temp_variation[stage].union(day_item.noselect_variation))
                 temp_variation[stage] = (temp_variation[stage].union(day_item.dosage_variation))
+                temp_variation[stage] = (temp_variation[stage].union(day_item.planday_variation))
+                temp_variation[stage] = (temp_variation[stage].union(day_item.freq_variation))
+
                 # print(stage, temp_variation[stage] , "\n")
 
             for stage, stage_items in temp_variation.items():

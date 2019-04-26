@@ -142,7 +142,7 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
 
 def calculate_stage_variation(stage_list, cp, day_orders):
     """
-        获取某一天对应阶段的3种变异情况，新增变异，必选项未选变异以及剂量变异
+        获取某一天对应阶段的3种变异情况，新增变异、必选项未选变异、剂量变异、天数变异、频率变异
     :param stage_list: 该天对应的阶段list，变异加入该天对应的第一个阶段 [start, end]
     :param cp: 模板的临床路径类
     :param day_orders: 这一天的用药情况，输入的是一个 list[], 里面存放的是每一个医嘱的详细信息dict格式, 样例如下
@@ -160,66 +160,89 @@ def calculate_stage_variation(stage_list, cp, day_orders):
         stage_list.append(str(day))
 
     # 表示为一个结构体
-    # 该结构体有4个变量，分别是stage_num, newadd_variation, noselect_variation, dosage_variation
+    # 该结构体有4个变量，分别是stage_num, newadd_variation, noselect_variation, dosage_variation, planday_variation, freq_variation
     class Stage_variation():
         def __init__(self):
             self.stage_num = None
-            self.newadd_variation = None
-            self.noselect_variation = None
-            self.dosage_variation = None
+            self.variation_num = 0
+            self.newadd_variation = set()
+            self.noselect_variation = set()
+            self.dosage_variation = set()
+            self.planday_variation = set()
+            self.freq_variation = set()
 
     stage_variation = Stage_variation()
     stage_variation.stage_num = min(stage_list)
-    stage_variation.newadd_variation = set()
-    stage_variation.noselect_variation = set()
-    stage_variation.dosage_variation = set()
+    # stage_variation.newadd_variation = set()
+    # stage_variation.noselect_variation = set()
+    # stage_variation.dosage_variation = set()
 
     # 获取stage_list中所有阶段中临床路径定义的医嘱, 并且单独抽取出必选项医嘱
     cp_orders = dict()
-    required_orders = set()     # 必选医嘱
+    required_orders = set()     # 必选医嘱，则将其code加入required_orders【此处考虑的是这一天对应阶段的所有必选医嘱】
     for stage_no in stage_list:
         stage_orders = cp.stage[stage_no].stage_orders_detail   #字典,该阶段包含的医嘱code ---> 医嘱的详细信息(Basic_Order_Info类)
+        required_orders = required_orders | cp.stage[stage_no].stage_required_codes_set
 
-        # 此处未考虑对于不同阶段的同一种医嘱，使用剂量不同的情况
+        # 此处未考虑对于不同阶段的同一种医嘱，使用剂量，频率，天数不同的情况
         for key, value in stage_orders.items():
             if key in cp_orders:
                 pass    # 若考虑剂量，可以将剂量小的覆盖
             else:
                 cp_orders[key] = value
 
-            # 若属于必选医嘱，则将其code加入required_orders
-            # TODO
-
-    # 变异该天所用的医嘱，判断是否是新增变异还是剂量符合要求
+    # 统计变异【新增变异、剂量变异、天数变异、频率变异】
     day_order_code_set = set()  # 该天使用医嘱的code集合，用于判断必选项未选
     for order in day_orders:
         order_code = order["CLINIC_ITEM_CODE"]
         day_order_code_set.add(order_code)
 
-        # 该code不在cp_orders里面，则属于新增变异
+        # 是否存在【剂量变异、天数变异、频率变异】的标识，一种实际医嘱可能存在多种变异类型，在统计中只计算一次
+        variation_flag = False
+
+        # 该code不在规定医嘱集里面，则属于新增变异
         if order_code not in cp_orders:
             stage_variation.newadd_variation.add(order_code)
-        # 在cp_orders里面则判断是否属于剂量变异
+            stage_variation.variation_num += 1
+
+        # 在规定医嘱集里面则判断是否属于【剂量变异、天数变异、频率变异】
         else:
-            # 比较剂量, 注意需要考虑有些临床路径定义的医嘱内AMOUNT字段为空
             cp_order_detail = cp_orders[order_code]
 
-            # cp中定义的剂量为空
-            # 'G11-51703', 'PID025P     1PC', 'PIG012P     1PC'
-            # if order_code == 'G11-51703' or order_code == 'PID025P     1PC' or order_code == 'PIG012P     1PC':
-            #     print("Amount: ", cp_order_detail.order_amount)
-
+            # 比较剂量, 注意需要考虑有些临床路径定义的医嘱内AMOUNT字段为空
             if not cp_order_detail.order_amount:
-                continue
+                pass
             else:
                 # 实际使用剂量大于cp中定义的剂量, 则将其加入dosage_variation异常
                 if cp_order_detail.order_amount < order["AMOUNT"]:
                     stage_variation.dosage_variation.add(order_code)
+                    variation_flag = True
 
-    # 对于必选项未选，则加入异常
+            # 比较天数变异, 若实际医嘱的计划天数大于规定医嘱的计划天数，则判断为变异
+            if not cp_order_detail.order_plan_days:
+                pass
+            else:
+                if cp_order_detail.order_plan_days < order["PLAN_DAYS"]:
+                    stage_variation.planday_variation.add(order_code)
+                    variation_flag = True
+
+            # 比较频率变异，若频率不同则判断为变异
+            if not cp_order_detail.order_freq:
+                pass
+            else:
+                if cp_order_detail.order_freq != order["FREQ_CODE"]:
+                    stage_variation.freq_variation.add(order_code)
+                    variation_flag = True
+
+        if variation_flag:
+            stage_variation.variation_num += 1
+
+    # 统计必选项未选变异
     for order in required_orders:
         if order not in day_order_code_set:
             stage_variation.noselect_variation.add(order)
+            stage_variation.variation_num += 1
+
 
     return stage_variation
 

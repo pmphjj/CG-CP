@@ -70,10 +70,6 @@ class Clinical_Pathway(object):
 
         return CP_str
 
-    def update_required_order_dict(self):
-        #TODO 更新必选词表
-        pass
-
     def show_info(self):
         #展示类的基本信息
         print("cp_id:"+self.cp_id)
@@ -111,6 +107,9 @@ class Stages(object):
             stage_name
             stage_item_codes_set: set,该阶段所有医嘱编号的集合
             stage_orders_detail: 字典,该阶段包含的医嘱code ---> 医嘱的详细信息
+            stage_required_codes_set: set, 该阶段所有必选医嘱编号的集合
+            stage_required_detail: 字典,该阶段包含的必选医嘱code ---> 医嘱的详细信息
+            
         '''
 
         self.cp_id = cp_id
@@ -124,21 +123,36 @@ class Stages(object):
 
         self.stage_item_codes_set = set()
         self.stage_orders_detail = dict()
-        # self.stage_variation = CP_Variation()
+        self.stage_required_codes_set = set()
+        self.stage_required_detail = dict()
 
-        # 获取该阶段的药物codes
+        # 该阶段的医嘱详细信息表
         cp_orders = pd.read_sql_query(
             "select * from CP_DETAIL_ORDER where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
                 self.version_sqno) + "' and STAGE_SQNO = '" + str(self.stage_sqno) + "'", conn)
 
-        cp_orders_columns_list = cp_orders.columns.values.tolist()
-        for each_order in cp_orders.iterrows():
+        # 该阶段的路径内容记录，主要用于判断医嘱是否必选
+        cp_detail_info = pd.read_sql_query("select * from CP_DETAIL_INFO where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
+                self.version_sqno) + "' and STAGE_SQNO = '" + str(self.stage_sqno) + "'", conn).rename(columns={"ITEM_SQNO": "ORDER_SQNO"})
+
+        # 获取必选医嘱的codes集合
+        cp_info = cp_orders.merge(cp_detail_info, how="left", on=["CP_ID", "VERSION_SQNO", "STAGE_SQNO", "ORDER_SQNO"])
+        cp_require_order = cp_info[cp_info.REQUIRED == "1"]
+        self.stage_required_codes_set = set(cp_require_order.CLINIC_ITEM_CODE)
+
+        cp_orders_columns_list = cp_orders.columns.values.tolist()  # 获取字段名称
+        for each_order in cp_info.iterrows():
 
             self.stage_item_codes_set.add(each_order[1]["CLINIC_ITEM_CODE"])
 
             # 创建医嘱详情
             each_order_dict = dict([(k, each_order[1][k]) for k in cp_orders_columns_list])
-            self.stage_orders_detail[each_order[1]["CLINIC_ITEM_CODE"]] = Orders.Basic_Order_Info(each_order_dict)
+            order_detail = Orders.Basic_Order_Info(each_order_dict)
+            self.stage_orders_detail[each_order[1]["CLINIC_ITEM_CODE"]] = order_detail
+
+            # 若医嘱在必选医嘱集中，则将其加入必选医嘱的详情dict
+            if each_order[1]["CLINIC_ITEM_CODE"] in self.stage_required_codes_set:
+                self.stage_required_detail[each_order[1]["CLINIC_ITEM_CODE"]] = order_detail
 
             # 将医嘱放入医嘱字典
             Orders.Orders_Dict.add_orders(each_order_dict)
@@ -196,22 +210,32 @@ class CP_Variation(object):
         self.newadd_variation_num = 0
         self.noselect_variation_num = 0
         self.dosage_variation_num = 0
+        self.planday_variation_num = 0
+        self.freq_variation_num = 0
 
         self.newadd_variation = defaultdict(int)
         self.noselect_variation = defaultdict(int)
         self.dosage_variation = defaultdict(int)
+        self.planday_variation = defaultdict(int)
+        self.freq_variation = defaultdict(int)
+
+    def update_variation_num(self, num):
+        self.variation_num += num
 
     def update_newadd_num(self):
         self.newadd_variation_num += 1
-        self.variation_num += 1
 
     def update_noselect_num(self):
         self.noselect_variation_num += 1
-        self.variation_num += 1
 
     def update_dosage_num(self):
         self.dosage_variation_num += 1
-        self.variation_num += 1
+
+    def update_planday_num(self):
+        self.planday_variation_num += 1
+
+    def update_freq_num(self):
+        self.freq_variation_num += 1
 
 if __name__ == "__main__":
     cp = Clinical_Pathway("4,621", "3")
