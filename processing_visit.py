@@ -6,8 +6,8 @@ class VISIT_Analyzer(object):
     """
         实时visit分析器：对于特定临床路径和动态visit数据的实时变异分析类
         cp: 输入的临床路径
-        day_level_info: visit中的day_level_info字段值，date ---> list[]
-        day_stage_map: 每天属于的阶段区间 {date:[start_stage,end_stage]}
+        day_level_info: visit中的day_level_info字段值，dict类型，{date ---> list[]}
+        day_stage_map: 每天属于的阶段区间，dict类型， {date:[start_stage,end_stage]}
         """
     def __init__(self,input_cp,visit_day_level_info):
         self.cp = input_cp
@@ -22,18 +22,23 @@ class VISIT_Analyzer(object):
         :param order: 医嘱 dict类型
         :return:order的变异情况
         """
+        #判断添加医嘱日期是否合理
         if date not in self.day_level_info:
             self.day_level_info[date] = []
+        #添加医嘱
         self.day_level_info[date].append(order)
+        #重新划分visit的阶段
         self.day_stage_map = self.split_visit_stage()
         if date not in self.day_stage_map:
             print("{}.{} ERROR: date not in day_stage_map!".format(date,order["CLINIC_ITEM_CODE"]))
             return None
+        #获得加入医嘱当天的阶段范围
         stage_list = self.day_stage_map[date]
         if stage_list is None or len(stage_list) == 0:
             print("{}.{} ERROR: invalid stage_list!".format(date,order["CLINIC_ITEM_CODE"]))
             return None
         stage_list = [str(x) for x in range(stage_list[0],stage_list[-1]+1)]
+        #获得当天的临床路径规定医嘱集
         cp_orders = dict()
         for stage_no in stage_list:
             stage_orders = self.cp.stage[stage_no].stage_orders_detail  # 字典: 该阶段包含的医嘱code ---> 医嘱的详细信息(Basic_Order_Info类)
@@ -44,12 +49,13 @@ class VISIT_Analyzer(object):
                     pass  # 若考虑剂量，可以将剂量小的覆盖
                 else:
                     cp_orders[key] = value
-        day_variation = self.get_order_var_info(order, cp_orders)
-        if len(day_variation) == 0:
+        #基于当天的临床路径规定医嘱集，计算新添加医嘱的变异情况
+        order_variation = self.get_order_var_info(order, cp_orders)
+        if len(order_variation) == 0:
             print("{}.{}({}):No variation.".format(date,order["CLINIC_ITEM_CODE"],order["ORDER_NAME"]))
         else:
-            print("{}.{}({}):  {}".format(date,order["CLINIC_ITEM_CODE"],order["ORDER_NAME"],day_variation))
-        return day_variation
+            print("{}.{}({}):  {}".format(date,order["CLINIC_ITEM_CODE"],order["ORDER_NAME"],order_variation))
+        return order_variation
 
 
     def delete_order(self, date, order):
@@ -57,7 +63,7 @@ class VISIT_Analyzer(object):
         删除医嘱，更新阶段划分表
         :param date:医嘱发生日期（精确到天）
         :param order:医嘱 dict()
-        :return:
+        :return:是否删除成功，True/False
         """
         if date not in self.day_level_info:
             print ("{}.{} date not in visit!".format(date,order["CLINIC_ITEM_CODE"]))
@@ -65,14 +71,22 @@ class VISIT_Analyzer(object):
         if order not in self.day_level_info[date]:
             print("{}.{} order not in the order list of the date!".format(date,order["CLINIC_ITEM_CODE"]))
             return False
+        #删除医嘱
         self.day_level_info[date].remove(order)
         if len(self.day_level_info[date]) == 0:
             self.day_level_info.pop(date)
+        #更新阶段划分表
         self.day_stage_map = self.split_visit_stage()
         print("{}.{} Successfully delete.".format(date,order["CLINIC_ITEM_CODE"]))
         return True
 
     def get_order_var_info(self, order, cp_orders):
+        """
+        基于临床路径规定医嘱集，计算输入医嘱的变异情况
+        :param order: 输入的医嘱
+        :param cp_orders: 临床路径规定医嘱集
+        :return: 输入医嘱的变异情况
+        """
         order_code = order["CLINIC_ITEM_CODE"]
         #记录order的变异情况
         order_variation = dict()
@@ -116,6 +130,11 @@ class VISIT_Analyzer(object):
         return order_variation
 
     def split_visit_stage(self, type = "new"):
+        """
+        划分visit阶段，获取day_stage_map，可以选择不同的方法
+        :param type:
+        :return:
+        """
         if type == "old":
             return self.__get_stage_by_split_visit_oldway()
         if type == "new":
@@ -233,5 +252,6 @@ if __name__ == "__main__":
         dayOrders_list = visit_day_level_info[date]
         print()
         for order in dayOrders_list:
+
             visit_analyzer.add_order(date,order)
         visit_analyzer.delete_order(date,dayOrders_list[-1])
