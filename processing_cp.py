@@ -270,40 +270,50 @@ class CP_Analyzer(object):
                 # 更新日期对应第一个阶段的总异常
                 new_variation["stages"][day_variation.stage_num].update_variation_num(day_variation.variation_num)
 
+                # if day_variation.stage_num == "3":
+                #     print(day_variation.variation_num)
+                #     print(day_variation.newadd_variation)
+                #     print(day_variation.noselect_variation)
+                #     print(day_variation.planday_variation)
+                #     print(day_variation.freq_variation)
+                #     print(day_variation.dosage_variation)
+                #     print()
+
+
                 # 更新新增变异
                 if len(day_variation.newadd_variation)!=0:
                     has_Variation = True
-                    for order_code in day_variation.newadd_variation:
-                        new_variation["stages"][day_variation.stage_num].newadd_variation[order_code] += 1
-                        new_variation["stages"][day_variation.stage_num].update_newadd_num()
+                    for order_code, nums in day_variation.newadd_variation.items():
+                        new_variation["stages"][day_variation.stage_num].newadd_variation[order_code] += nums
+                        new_variation["stages"][day_variation.stage_num].update_newadd_num(nums)
 
                 # 更新必选项未选变异
                 if len(day_variation.noselect_variation)!=0:
                     has_Variation = True
                     for order_code in day_variation.noselect_variation:
-                        new_variation["stages"][day_variation.stage_num].noselect_variation[order_code] += 1
-                        new_variation["stages"][day_variation.stage_num].update_noselect_num()
+                        new_variation["stages"][day_variation.stage_num].noselect_variation[order_code] += nums
+                        new_variation["stages"][day_variation.stage_num].update_noselect_num(nums)
 
                 # 更新剂量变异
                 if len(day_variation.dosage_variation) != 0:
                     has_Variation = True
                     for order_code in day_variation.dosage_variation:
-                        new_variation["stages"][day_variation.stage_num].dosage_variation[order_code] += 1
-                        new_variation["stages"][day_variation.stage_num].update_dosage_num()
+                        new_variation["stages"][day_variation.stage_num].dosage_variation[order_code] += nums
+                        new_variation["stages"][day_variation.stage_num].update_dosage_num(nums)
 
                 # 更新天数变异
                 if len(day_variation.planday_variation) != 0:
                     has_Variation = True
                     for order_code in day_variation.planday_variation:
-                        new_variation["stages"][day_variation.stage_num].planday_variation[order_code] += 1
-                        new_variation["stages"][day_variation.stage_num].update_planday_num()
+                        new_variation["stages"][day_variation.stage_num].planday_variation[order_code] += nums
+                        new_variation["stages"][day_variation.stage_num].update_planday_num(nums)
 
                 # 更新频率变异
-                if len(day_variation.dosage_variation) != 0:
+                if len(day_variation.freq_variation) != 0:
                     has_Variation = True
                     for order_code in day_variation.freq_variation:
-                        new_variation["stages"][day_variation.stage_num].freq_variation[order_code] += 1
-                        new_variation["stages"][day_variation.stage_num].update_freq_num()
+                        new_variation["stages"][day_variation.stage_num].freq_variation[order_code] += nums
+                        new_variation["stages"][day_variation.stage_num].update_freq_num(nums)
 
             # 更新new_variation的cp，visits_count
             if has_Variation:

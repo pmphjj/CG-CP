@@ -222,20 +222,20 @@ class CP_Variation(object):
     def update_variation_num(self, num):
         self.variation_num += num
 
-    def update_newadd_num(self):
-        self.newadd_variation_num += 1
+    def update_newadd_num(self, num=1):
+        self.newadd_variation_num += num
 
-    def update_noselect_num(self):
-        self.noselect_variation_num += 1
+    def update_noselect_num(self, num=1):
+        self.noselect_variation_num += num
 
-    def update_dosage_num(self):
-        self.dosage_variation_num += 1
+    def update_dosage_num(self, num=1):
+        self.dosage_variation_num += num
 
-    def update_planday_num(self):
-        self.planday_variation_num += 1
+    def update_planday_num(self, num=1):
+        self.planday_variation_num += num
 
-    def update_freq_num(self):
-        self.freq_variation_num += 1
+    def update_freq_num(self, num=1):
+        self.freq_variation_num += num
 
 if __name__ == "__main__":
     cp = Clinical_Pathway("4,621", "3")

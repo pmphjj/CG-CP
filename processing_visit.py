@@ -36,7 +36,7 @@ class VISIT_Analyzer(object):
         stage_list = [str(x) for x in range(stage_list[0],stage_list[-1]+1)]
         cp_orders = dict()
         for stage_no in stage_list:
-            stage_orders = self.cp.stage[stage_no].stage_orders_detail  # 字典,该阶段包含的医嘱code ---> 医嘱的详细信息(Basic_Order_Info类)
+            stage_orders = self.cp.stage[stage_no].stage_orders_detail  # 字典: 该阶段包含的医嘱code ---> 医嘱的详细信息(Basic_Order_Info类)
 
             # 此处未考虑对于不同阶段的同一种医嘱，使用剂量，频率，天数不同的情况
             for key, value in stage_orders.items():
@@ -44,7 +44,7 @@ class VISIT_Analyzer(object):
                     pass  # 若考虑剂量，可以将剂量小的覆盖
                 else:
                     cp_orders[key] = value
-        day_variation = self.get_order_var_info(order,cp_orders)
+        day_variation = self.get_order_var_info(order, cp_orders)
         if len(day_variation) == 0:
             print("{}.{}({}):No variation.".format(date,order["CLINIC_ITEM_CODE"],order["ORDER_NAME"]))
         else:
@@ -52,8 +52,7 @@ class VISIT_Analyzer(object):
         return day_variation
 
 
-
-    def delete_order(self,date,order):
+    def delete_order(self, date, order):
         """
         删除医嘱，更新阶段划分表
         :param date:医嘱发生日期（精确到天）
@@ -73,7 +72,7 @@ class VISIT_Analyzer(object):
         print("{}.{} Successfully delete.".format(date,order["CLINIC_ITEM_CODE"]))
         return True
 
-    def get_order_var_info(self,order,cp_orders):
+    def get_order_var_info(self, order, cp_orders):
         order_code = order["CLINIC_ITEM_CODE"]
         #记录order的变异情况
         order_variation = dict()
@@ -116,7 +115,7 @@ class VISIT_Analyzer(object):
 
         return order_variation
 
-    def split_visit_stage(self,type = "old"):
+    def split_visit_stage(self, type = "new"):
         if type == "old":
             return self.__get_stage_by_split_visit_oldway()
         if type == "new":
@@ -166,7 +165,7 @@ class VISIT_Analyzer(object):
             cur_stage_num = temp_stage_num
 
         return day_stage_map
-    # 注应用新版的阶段划分方法
+    #注：应用新版的阶段划分方法
     def __get_stage_by_split_visit(self):
         """
         获取输入的visit的天与阶段的映射表
