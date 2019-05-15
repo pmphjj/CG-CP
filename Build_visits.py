@@ -7,28 +7,31 @@ import Orders
 
 class Build_Visist_Order(object):
 
-    def __init__(self, cp_id, version_sqno, db_config_path="./db_config.json", order_table_name="orders"):
+    def __init__(self, cp_id, version_sqno, orders_path):
         '''
             构造某临床路径的所有visit记录
         :param cp_id: 
         :param version_sqno: 
-        :param db_config_path: 
-        :param order_table_name: 
+        :param orders: DataFrame,
         '''
 
         self.cp_id = cp_id
         self.version_sqno = version_sqno
-        self.order_table_name = order_table_name
 
         self.all_visits_dict = dict()    # all_visits_dict存放的是visit的集合，visit_id ---> Visit类
 
         # 读取数据库,建立连接
-        with open(db_config_path, "r") as f:
-            self.db_config = json.loads(f.read())
-        self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
+        # with open(db_config_path, "r") as f:
+        #     self.db_config = json.loads(f.read())
+        # self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
+
+        orders = pd.read_csv(orders_path, sep="\t")
+        self.all_visits = orders
+
         self.__build_visits_info__()
         self.show_info()
-        self.conn.close()
+
+        # self.conn.close()
 
     def __build_visits_info__(self):
         '''
@@ -36,12 +39,10 @@ class Build_Visist_Order(object):
         :return: 
         '''
 
-        self.all_visits = pd.read_sql_query(
-            "select * from " + self.order_table_name, self.conn)
 
         for each_tuple in self.all_visits.groupby("VISIT_ID"):
-            visit_id = each_tuple[0]
-            each_visit = each_tuple[1]  #dataframe
+            visit_id = str(each_tuple[0])   # string
+            each_visit = each_tuple[1]      # dataframe
 
             new_visit = Visit(visit_id, each_visit)
 
@@ -54,13 +55,13 @@ class Build_Visist_Order(object):
         #展示类的基本信息
         print("cp_id:"+self.cp_id)
         print("version_sqno:"+str(self.version_sqno))
-        print("order_table_name:"+self.order_table_name)
         print("visits amount:"+str(len(self.all_visits_dict)))
 
 
 class Visit(object):
 
     def __init__(self,visit_id, visit_info):
+
         '''
         :param visit_info: Dataframe的格式
         '''
@@ -95,9 +96,10 @@ class Visit(object):
             self.day_level_info[date] = day_list
 
 
+if __name__ == "__main__":
+    input_visits = Build_Visist_Order("4,621", "3", "data/orders.csv")
 
-
-
+    print(input_visits.all_visits_dict)
 
 
 

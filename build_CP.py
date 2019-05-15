@@ -5,12 +5,13 @@ import Orders
 from collections import defaultdict
 
 class Clinical_Pathway(object):
-    def __init__(self, cp_id, version_sqno, db_config_path="./db_config.json"):
+
+    def __init__(self, cp_id, version_sqno, cp_info_path, cp_stage_path, cp_detail_order_path, cp_detail_info_path):
         '''
             初始化临床路径类
         :param db_config_path: 数据库配置地址
-        :param cp_id: 需要建立的临床路径id
-        :param version_sqno: 需要建立的临床路径版本
+        :param cp_id: 需要建立的临床路径id,  string
+        :param version_sqno: 需要建立的临床路径版本, string
 
             临床路径有如下参数：
             cp_id
@@ -30,35 +31,48 @@ class Clinical_Pathway(object):
         self.required_order_dict = dict()
 
         # 读取数据库,建立连接
-        with open(db_config_path, "r") as f:
-            self.db_config = json.loads(f.read())
-        self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
+        # with open(db_config_path, "r") as f:
+        #     self.db_config = json.loads(f.read())
+        # self.conn = sqlite3.connect(self.db_config["db_path"] + self.db_config["db_filename"])
+
+        # 读取并筛选csv文件中的数据
+        cp_info = pd.read_csv(cp_info_path, sep="\t")
+        cp_stage = pd.read_csv(cp_stage_path, sep="\t")
+        cp_detail_order = pd.read_csv(cp_detail_order_path, sep="\t")
+        cp_detail_info = pd.read_csv(cp_detail_info_path, sep="\t")
+
+        self.cp_info = cp_info[(cp_info.CP_ID.astype(str) == self.cp_id) & (cp_info.VERSION_SQNO.astype(str) == self.version_sqno)].reset_index(drop=True)
+        self.cp_stage = cp_stage[(cp_stage.CP_ID.astype(str) == self.cp_id) & (cp_stage.VERSION_SQNO.astype(str) == self.version_sqno)].reset_index(drop=True)
+        self.cp_detail_order = cp_detail_order[(cp_detail_order.CP_ID.astype(str) == self.cp_id) & (cp_detail_order.VERSION_SQNO.astype(str) == self.version_sqno)].reset_index(drop=True)
+        self.cp_detail_info = cp_detail_info[(cp_detail_info.CP_ID.astype(str) == self.cp_id) & (cp_detail_info.VERSION_SQNO.astype(str) == self.version_sqno)].reset_index(drop=True)
 
         self.__build_cp__()
         self.show_info()
-        self.conn.close()
+
+        # self.conn.close()
+
         return
 
     def __build_cp__(self):
 
         # 处理临床路径的基本信息
-        cp_info = pd.read_sql_query(
-            "select * from CP_INFO where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
-                self.version_sqno) + "'", self.conn)
-        self.cp_name = cp_info.loc[0]["CP_NAME"]
+        # cp_info = pd.read_sql_query(
+        #     "select * from CP_INFO where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
+        #         self.version_sqno) + "'", self.conn)
+        self.cp_name = self.cp_info.loc[0]["CP_NAME"]
 
         # 处理临床路径的阶段信息
-        cp_stage = pd.read_sql_query(
-            "select * from CP_STAGE where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
-                self.version_sqno) + "'", self.conn)
-        cp_stage = cp_stage.sort_values("STAGE_SQNO")
+        # cp_stage = pd.read_sql_query(
+        #     "select * from CP_STAGE where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
+        #         self.version_sqno) + "'", self.conn)
+        cp_stage = self.cp_stage.sort_values("STAGE_SQNO")
         self.stage_nums = len(cp_stage)
 
         cp_stage_columns_list = cp_stage.columns.values.tolist()
         for each_stage in cp_stage.iterrows():
             each_stage_dict = dict([(k, each_stage[1][k]) for k in cp_stage_columns_list])
-            new_stage = Stages(self.cp_id, self.version_sqno, each_stage_dict, self.conn)
-            self.stage[each_stage[1]["STAGE_SQNO"] ]= new_stage
+            new_stage = Stages(self.cp_id, self.version_sqno, self.cp_detail_order, self.cp_detail_info, each_stage_dict)
+            self.stage[str(each_stage[1]["STAGE_SQNO"]) ]= new_stage
 
         return
 
@@ -66,7 +80,7 @@ class Clinical_Pathway(object):
         CP_str = ""
 
         for sqno, stage in self.stage.items():
-            CP_str += sqno + " " + stage.get_stage_item_codes() + "\n"
+            CP_str += str(sqno) + " " + str(stage.get_stage_item_codes()) + "\n"
 
         return CP_str
 
@@ -89,13 +103,14 @@ class Clinical_Pathway(object):
             return
         return self.stage[x].stage_item_codes_set
 
-
 class Stages(object):
-    def __init__(self, cp_id, version_sqno, stage_info, conn):
+    def __init__(self, cp_id, version_sqno, cp_detail_order, cp_detail_info, stage_info):
         '''
             临床路径的阶段类
         :param cp_id: 临床路径的id
         :param version_sqno: 临床路径的版本
+        :param cp_detail_order: 
+        :param cp_detail_info:
         :param stage_info: 临床路径阶段的详细信息, dict格式
         :param conn: 数据库连接
 
@@ -127,17 +142,22 @@ class Stages(object):
         self.stage_required_detail = dict()
 
         # 该阶段的医嘱详细信息表
-        cp_orders = pd.read_sql_query(
-            "select * from CP_DETAIL_ORDER where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
-                self.version_sqno) + "' and STAGE_SQNO = '" + str(self.stage_sqno) + "'", conn)
+        # cp_orders = pd.read_sql_query(
+        #     "select * from CP_DETAIL_ORDER where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
+        #         self.version_sqno) + "' and STAGE_SQNO = '" + str(self.stage_sqno) + "'", conn)
+        cp_orders = cp_detail_order[cp_detail_order.STAGE_SQNO == self.stage_sqno].reset_index(drop=True)
 
         # 该阶段的路径内容记录，主要用于判断医嘱是否必选
-        cp_detail_info = pd.read_sql_query("select * from CP_DETAIL_INFO where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
-                self.version_sqno) + "' and STAGE_SQNO = '" + str(self.stage_sqno) + "'", conn).rename(columns={"ITEM_SQNO": "ORDER_SQNO"})
+        # cp_detail_info = pd.read_sql_query("select * from CP_DETAIL_INFO where CP_ID = '" + str(self.cp_id) + "' and VERSION_SQNO = '" + str(
+        #         self.version_sqno) + "' and STAGE_SQNO = '" + str(self.stage_sqno) + "'", conn).rename(columns={"ITEM_SQNO": "ORDER_SQNO"})
+
+        cp_detail_info = cp_detail_info[cp_detail_info.STAGE_SQNO == self.stage_sqno].rename(columns={"ITEM_SQNO": "ORDER_SQNO"}).reset_index(drop=True)
+
 
         # 获取必选医嘱的codes集合
         cp_info = cp_orders.merge(cp_detail_info, how="left", on=["CP_ID", "VERSION_SQNO", "STAGE_SQNO", "ORDER_SQNO"])
-        cp_require_order = cp_info[cp_info.REQUIRED == "1"]
+
+        cp_require_order = cp_info[ cp_info.REQUIRED.astype(str) == "1"]
         self.stage_required_codes_set = set(cp_require_order.CLINIC_ITEM_CODE)
 
         cp_orders_columns_list = cp_orders.columns.values.tolist()  # 获取字段名称
@@ -197,8 +217,6 @@ class Stages(object):
     def get_stage_item_codes(self):
         return ",".join(self.stage_item_codes_set)
 
-
-
 class CP_Variation(object):
 
     def __init__(self):
@@ -238,5 +256,6 @@ class CP_Variation(object):
         self.freq_variation_num += num
 
 if __name__ == "__main__":
-    cp = Clinical_Pathway("4,621", "3")
-    print(cp)
+    cp = Clinical_Pathway("4,621", "3", "data/cp_info.csv", "data/cp_stage.csv", "data/cp_detail_order.csv", "data/cp_detail_info.csv")
+
+    print(cp.get_stage_code(2))
