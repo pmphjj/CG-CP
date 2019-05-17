@@ -1,6 +1,7 @@
 # coding: utf-8
 from build_CP import Clinical_Pathway,Stages,CP_Variation
 from Build_visits import Build_Visist_Order
+import operate
 
 class VISIT_Analyzer(object):
     """
@@ -241,17 +242,94 @@ class VISIT_Analyzer(object):
 
         return day_stage_map
 
+def analyze_orders(input_cp, day_orders, input_orders, last_day_stage_num):
+    """
+    获取新开医嘱集的变异情况
+    :param input_cp: 临床路径
+    :param day_orders: 当天该病人已开过的医嘱集 list
+    :param input_orders: 当前新开的医嘱集 list
+    :param last_day_stage_num: 上一天的终止阶段
+    :return: 新开医嘱集中的异常情况
+    """
+
+    all_orders = day_orders + input_orders
+    cur_stage_num = last_day_stage_num
+    max_stage_num = input_cp.stage_nums
+    # 阶段-历史医嘱dict {阶段序号：set(该阶段历史医嘱代码)} 用于必选医嘱没选的检查
+    stage_order_dict = dict([(x, set()) for x in range(1, max_stage_num + 1)])
+
+    # 划分阶段 ，暂不考虑路径定义的阶段长度与具体执行日期间的差异
+    temp_stage_num = cur_stage_num
+    # 获取当天医嘱的编码集合,没有考虑出现重复医嘱的情况
+    day_item_code_set = set([x["CLINIC_ITEM_CODE"] for x in all_orders])
+    #获取当天的阶段列表
+    while len(day_item_code_set) > 0 and temp_stage_num <= max_stage_num:
+        temp_stage_code_set = input_cp.get_stage_code(temp_stage_num)
+
+        # 当天剩余医嘱与当前阶段有交集，取其差集
+        intersec_set = day_item_code_set.intersection(temp_stage_code_set)
+        if len(intersec_set) > 0:
+            stage_order_dict[temp_stage_num] = stage_order_dict[temp_stage_num].union(intersec_set)
+            day_item_code_set = day_item_code_set.difference(temp_stage_code_set)
+        else:
+            # 无交集，判断与下一阶段是否有交集，若仍无交集，则视其为变异
+            if temp_stage_num == max_stage_num:
+                break
+            temp_next_stage_code_set = input_cp.get_stage_code(temp_stage_num + 1)
+            next_intersec_set = day_item_code_set.intersection(temp_next_stage_code_set)
+            if len(next_intersec_set) > 0:
+                stage_order_dict[temp_stage_num + 1] = stage_order_dict[temp_stage_num + 1].union(
+                    next_intersec_set)
+                day_item_code_set = day_item_code_set.difference(temp_next_stage_code_set)
+                temp_stage_num += 1
+            else:
+                break
+    stage_list = [str(x) for x in range(last_day_stage_num,temp_stage_num + 1)]
+
+    # 获得当天的临床路径规定医嘱集
+    cp_orders = dict()
+    for stage_no in stage_list:
+        stage_orders = input_cp.stage[
+            stage_no].stage_orders_detail  # 字典: 该阶段包含的医嘱code ---> 医嘱的详细信息(Basic_Order_Info类)
+
+        # 此处未考虑对于不同阶段的同一种医嘱，使用剂量，频率，天数不同的情况
+        for key, value in stage_orders.items():
+            if key in cp_orders:
+                pass  # 若考虑剂量，可以将剂量小的覆盖
+            else:
+                cp_orders[key] = value
+    # 基于当天的临床路径规定医嘱集，计算新添加医嘱的变异情况
+    orders_var_info = []
+    for order in input_orders:
+        order_variation = operate.get_order_var_info(order, cp_orders)
+        if len(order_variation) == 0:
+            print("{}({}):No variation.".format(order["CLINIC_ITEM_CODE"], order["ORDER_NAME"]))
+        else:
+            print("{}({}):  {}".format(order["CLINIC_ITEM_CODE"], order["ORDER_NAME"], order_variation))
+        orders_var_info.append((order,order_variation))
+    return orders_var_info
+
+
 if __name__ == "__main__":
     cp = Clinical_Pathway("4,621", "3")
     all_visits = Build_Visist_Order("4,621",3)
     visit_day_level_info = all_visits.all_visits_dict["3467225"].day_level_info
     print(len(visit_day_level_info))
 
+    for date in sorted(visit_day_level_info.keys()):
+        dayOrders_list = visit_day_level_info[date]
+        print(date)
+        input_orders = []
+        num = int(len(dayOrders_list)/2)
+        day_orders = dayOrders_list[0:num]
+        input_orders = dayOrders_list[num:len(dayOrders_list)]
+        var_info = analyze_orders(cp,day_orders,input_orders,1)
+        print()
+
     visit_analyzer = VISIT_Analyzer(cp,dict())
     for date in sorted(visit_day_level_info.keys()):
         dayOrders_list = visit_day_level_info[date]
         print()
         for order in dayOrders_list:
-
             visit_analyzer.add_order(date,order)
-        visit_analyzer.delete_order(date,dayOrders_list[-1])
+        # visit_analyzer.delete_order(date,dayOrders_list[-1])

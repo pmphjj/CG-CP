@@ -274,8 +274,51 @@ def add_orders_and_show(input_cp, input_visits, old_cp_analyzer, recommend_order
     print("\n新临床路径与旧路径变异情况比较：")
     compare_CP(old_cp_analyzer.get_newCP_variation(input_cp), old_cp_analyzer.get_newCP_variation(comp_cp), sorted(old_cp_analyzer.cp.stage.keys(), key=lambda x:x[0]))
 
+def get_order_var_info(order, cp_orders):
+    """
+    基于临床路径规定医嘱集，计算输入医嘱的变异情况
+    :param order: 输入的医嘱
+    :param cp_orders: 临床路径规定医嘱集
+    :return: 输入医嘱的变异情况
+    """
+    order_code = order["CLINIC_ITEM_CODE"]
+    #记录order的变异情况
+    order_variation = dict()
 
+    # 该code不在规定医嘱集里面，则属于新增变异
+    if order_code not in cp_orders:
+        order_variation["newadd_variation"]=True
 
+    # 在规定医嘱集里面则判断是否属于【剂量变异、天数变异、频率变异】
+    else:
+        cp_order_detail = cp_orders[order_code]
 
+        # 比较剂量, 注意需要考虑有些临床路径定义的医嘱内AMOUNT字段为空
+        if not cp_order_detail.order_amount:
+            pass
+        else:
+            # 实际使用剂量大于cp中定义的剂量, 则将其加入dosage_variation异常
+            if cp_order_detail.order_amount < order["AMOUNT"]:
+                order_variation["dosage_variation"] = dict()
+                order_variation["dosage_variation"]["order"] = cp_order_detail.order_amount
+                order_variation["dosage_variation"]["cp"] = order["AMOUNT"]
 
+        # 比较天数变异, 若实际医嘱的计划天数大于规定医嘱的计划天数，则判断为变异
+        if not cp_order_detail.order_plan_days:
+            pass
+        else:
+            if cp_order_detail.order_plan_days < order["PLAN_DAYS"]:
+                order_variation["planday_variation"] = dict()
+                order_variation["planday_variation"]["order"] = cp_order_detail.order_plan_days
+                order_variation["planday_variation"]["cp"] = order["PLAN_DAYS"]
 
+        # 比较频率变异，若频率不同则判断为变异
+        if not cp_order_detail.order_freq:
+            pass
+        else:
+            if cp_order_detail.order_freq != order["FREQ_CODE"]:
+                order_variation["freq_variation"] = dict()
+                order_variation["freq_variation"]["order"] = cp_order_detail.order_freq
+                order_variation["freq_variation"]["cp"] = order["FREQ_CODE"]
+
+    return order_variation
