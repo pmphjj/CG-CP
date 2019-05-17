@@ -4,41 +4,49 @@ from Build_visits import Build_Visist_Order
 import operate
 
 class VISIT_Analyzer(object):
+
     """
         实时visit分析器：对于特定临床路径和动态visit数据的实时变异分析类
         cp: 输入的临床路径
-        day_level_info: visit中的day_level_info字段值，dict类型，{date ---> list[]}
-        day_stage_map: 每天属于的阶段区间，dict类型， {date:[start_stage,end_stage]}
-        """
-    def __init__(self,input_cp,visit_day_level_info):
+        day_level_info: visit中的day_level_info字段值，dict类型，{ date ---> list[orders] }
+        day_stage_map: 每天属于的阶段区间，dict类型， { date: [start_stage, end_stage] }
+
+    """
+
+    def __init__(self,input_cp, visit_day_level_info):
         self.cp = input_cp
         self.day_level_info = visit_day_level_info
         self.day_stage_map = self.split_visit_stage()
 
 
-    def add_order(self,date,order):
+    def add_order(self, date, order):
         """
         向visit中添加新的医嘱，并返回该医嘱的变异情况
         :param date: 医嘱日期
         :param order: 医嘱 dict类型
         :return:order的变异情况
         """
+
         #判断添加医嘱日期是否合理
         if date not in self.day_level_info:
             self.day_level_info[date] = []
+
         #添加医嘱
         self.day_level_info[date].append(order)
+
         #重新划分visit的阶段
         self.day_stage_map = self.split_visit_stage()
         if date not in self.day_stage_map:
             print("{}.{} ERROR: date not in day_stage_map!".format(date,order["CLINIC_ITEM_CODE"]))
             return None
+
         #获得加入医嘱当天的阶段范围
         stage_list = self.day_stage_map[date]
         if stage_list is None or len(stage_list) == 0:
             print("{}.{} ERROR: invalid stage_list!".format(date,order["CLINIC_ITEM_CODE"]))
             return None
         stage_list = [str(x) for x in range(stage_list[0],stage_list[-1]+1)]
+
         #获得当天的临床路径规定医嘱集
         cp_orders = dict()
         for stage_no in stage_list:
@@ -53,9 +61,9 @@ class VISIT_Analyzer(object):
         #基于当天的临床路径规定医嘱集，计算新添加医嘱的变异情况
         order_variation = self.get_order_var_info(order, cp_orders)
         if len(order_variation) == 0:
-            print("{}.{}({}):No variation.".format(date,order["CLINIC_ITEM_CODE"],order["ORDER_NAME"]))
+            print("{}.{}({}):No variation.".format(date,order["CLINIC_ITEM_CODE"], order["ORDER_NAME"]))
         else:
-            print("{}.{}({}):  {}".format(date,order["CLINIC_ITEM_CODE"],order["ORDER_NAME"],order_variation))
+            print("{}.{}({}):  {}".format(date,order["CLINIC_ITEM_CODE"], order["ORDER_NAME"], order_variation))
         return order_variation
 
 
@@ -72,14 +80,18 @@ class VISIT_Analyzer(object):
         if order not in self.day_level_info[date]:
             print("{}.{} order not in the order list of the date!".format(date,order["CLINIC_ITEM_CODE"]))
             return False
+
         #删除医嘱
         self.day_level_info[date].remove(order)
         if len(self.day_level_info[date]) == 0:
             self.day_level_info.pop(date)
+
         #更新阶段划分表
         self.day_stage_map = self.split_visit_stage()
         print("{}.{} Successfully delete.".format(date,order["CLINIC_ITEM_CODE"]))
+
         return True
+
 
     def get_order_var_info(self, order, cp_orders):
         """
@@ -107,8 +119,8 @@ class VISIT_Analyzer(object):
                 # 实际使用剂量大于cp中定义的剂量, 则将其加入dosage_variation异常
                 if cp_order_detail.order_amount < order["AMOUNT"]:
                     order_variation["dosage_variation"] = dict()
-                    order_variation["dosage_variation"]["order"] = cp_order_detail.order_amount
-                    order_variation["dosage_variation"]["cp"] = order["AMOUNT"]
+                    order_variation["dosage_variation"]["order_amount"] = cp_order_detail.order_amount
+                    order_variation["dosage_variation"]["cp_amount"] = order["AMOUNT"]
 
             # 比较天数变异, 若实际医嘱的计划天数大于规定医嘱的计划天数，则判断为变异
             if not cp_order_detail.order_plan_days:
@@ -116,8 +128,8 @@ class VISIT_Analyzer(object):
             else:
                 if cp_order_detail.order_plan_days < order["PLAN_DAYS"]:
                     order_variation["planday_variation"] = dict()
-                    order_variation["planday_variation"]["order"] = cp_order_detail.order_plan_days
-                    order_variation["planday_variation"]["cp"] = order["PLAN_DAYS"]
+                    order_variation["planday_variation"]["order_plandays"] = cp_order_detail.order_plan_days
+                    order_variation["planday_variation"]["cp_plandays"] = order["PLAN_DAYS"]
 
             # 比较频率变异，若频率不同则判断为变异
             if not cp_order_detail.order_freq:
@@ -125,10 +137,11 @@ class VISIT_Analyzer(object):
             else:
                 if cp_order_detail.order_freq != order["FREQ_CODE"]:
                     order_variation["freq_variation"] = dict()
-                    order_variation["freq_variation"]["order"] = cp_order_detail.order_freq
-                    order_variation["freq_variation"]["cp"] = order["FREQ_CODE"]
+                    order_variation["freq_variation"]["order_freq"] = cp_order_detail.order_freq
+                    order_variation["freq_variation"]["cp_freq"] = order["FREQ_CODE"]
 
         return order_variation
+
 
     def split_visit_stage(self, type = "new"):
         """
@@ -140,6 +153,7 @@ class VISIT_Analyzer(object):
             return self.__get_stage_by_split_visit_oldway()
         if type == "new":
             return self.__get_stage_by_split_visit()
+
 
     #注：应用旧版的阶段划分方法
     def __get_stage_by_split_visit_oldway(self):
@@ -185,6 +199,8 @@ class VISIT_Analyzer(object):
             cur_stage_num = temp_stage_num
 
         return day_stage_map
+
+
     #注：应用新版的阶段划分方法
     def __get_stage_by_split_visit(self):
         """
@@ -311,6 +327,7 @@ def analyze_orders(input_cp, day_orders, input_orders, last_day_stage_num):
 
 
 if __name__ == "__main__":
+
     cp = Clinical_Pathway("4,621", "3")
     all_visits = Build_Visist_Order("4,621",3)
     visit_day_level_info = all_visits.all_visits_dict["3467225"].day_level_info
