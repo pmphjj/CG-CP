@@ -7,8 +7,8 @@ from collections import defaultdict
 def compare_CP(cp1_variation, cp2_variation, stage_num_list):
     '''
         比较两个临床路径变异情况
-    :param cp1_analyzer: 
-    :param cp2_analyzer: 
+    :param cp1_variation: CP_Analyzer类中的variation结构，{"cp": {"visits_count":0}, "stages": stages_v, "visits": visits_v} 
+    :param cp2_vatiation: 同上
     :return: 
     '''
     print("CP1的变异来访次数:{}, CP2的变异来访次数:{}".format(cp1_variation["cp"]["visits_count"], cp2_variation["cp"]["visits_count"]))
@@ -143,7 +143,7 @@ def selected_recomend_orders(cp, input_visits, cp1_analyzer, stage_frequent):
 
 def calculate_stage_variation(stage_list, cp, day_orders):
     """
-        获取某一天对应阶段的3种变异情况，新增变异、必选项未选变异、剂量变异、天数变异、频率变异
+        获取某一天对应阶段的5种变异情况，新增变异、必选项未选变异、剂量变异、天数变异、频率变异
         新增变异： 出现定义中没有出现的医嘱
         必选项未选变异： 该天对应的所有阶段的必选医嘱没有选择
         剂量变异：   医嘱的规定剂量与临床路径中的定义不同
@@ -217,29 +217,30 @@ def calculate_stage_variation(stage_list, cp, day_orders):
             cp_order_detail = cp_orders[order_code]
 
             # 比较剂量, 注意需要考虑有些临床路径定义的医嘱内AMOUNT字段为空
-            if not cp_order_detail.order_amount:
-                pass
-            else:
-                # 实际使用剂量大于cp中定义的剂量, 则将其加入dosage_variation异常
-                if cp_order_detail.order_amount < order["AMOUNT"]:
+            try:
+                if int(cp_order_detail.order_amount) < int(order["AMOUNT"].replace(",", "")):
                     stage_variation.dosage_variation[order_code] += 1
                     variation_flag = True
+            except:
+                pass
 
             # 比较天数变异, 若实际医嘱的计划天数大于规定医嘱的计划天数，则判断为变异
-            if not cp_order_detail.order_plan_days:
-                pass
-            else:
-                if cp_order_detail.order_plan_days < order["PLAN_DAYS"]:
+            try:
+                if int(cp_order_detail.order_plan_days) < int(order["PLAN_DAYS"].replace(",", "")):
                     stage_variation.planday_variation[order_code] += 1
                     variation_flag = True
+            except:
+                pass
 
             # 比较频率变异，若频率不同则判断为变异
-            if not cp_order_detail.order_freq:
-                pass
-            else:
-                if cp_order_detail.order_freq != order["FREQ_CODE"]:
+            try:
+                if str(cp_order_detail.order_freq) != str(order["FREQ_CODE"]) and str(cp_order_detail) != "None" and str(cp_order_detail) != "nan" and str(order["FREQ_CODE"]) != "None" and str(order["FREQ_CODE"]) != "nan":
+
+                    print(str(cp_order_detail.order_freq), str(order["FREQ_CODE"]))
                     stage_variation.freq_variation[order_code] += 1
                     variation_flag = True
+            except:
+                pass
 
         if variation_flag:
             stage_variation.variation_num += 1
@@ -252,11 +253,10 @@ def calculate_stage_variation(stage_list, cp, day_orders):
 
     return stage_variation
 
-def add_orders_and_show(input_cp, input_visits, old_cp_analyzer, recommend_orders):
+def add_orders_and_show(input_cp, old_cp_analyzer, recommend_orders):
     """
         将推荐的医嘱集加入临床路径并比较
     :param input_cp: 原始临床路径类
-    :param input_visits: 该病种的所有来访类
     :param old_cp_analyzer: 原始临床路径的分析类
     :param recommend_orders: 经过分析得到的推荐医嘱
     :return: 

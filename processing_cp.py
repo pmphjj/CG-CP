@@ -4,7 +4,6 @@ from Build_visits import Build_Visist_Order
 from Orders import Orders_Dict
 import operate
 
-
 class CP_Analyzer(object):
     """
     临床路径变异分析器,对于特定临床路径和历史visit数据的变异分析类
@@ -18,7 +17,7 @@ class CP_Analyzer(object):
             "day_stage_map":表示每天属于的阶段,  {日期:(起始阶段,终止阶段)}
 
     """
-    def __init__(self,input_cp,input_visits):
+    def __init__(self, input_cp, input_visits):
         self.cp = input_cp
         self.visits = input_visits
         self.variation = dict()
@@ -45,7 +44,12 @@ class CP_Analyzer(object):
         self.variation = self.get_newCP_variation(self.cp)
 
     def get_visit_info(self, input_visit):
-
+        '''
+            获取每天的基本信息以及与阶段的映射情况
+            stat_var = {"day": dict(), "day_stage_map": dict(), "stage": dict([(x, CP_Variation()) for x in self.cp.stage]), "day_level_info": dict()}
+        :param input_visit: 
+        :return: 
+        '''
         sort_visit_order_list = sorted(input_visit.day_level_info.items(), key=lambda x: x[0])
         stat_var = {"day": dict(), "day_stage_map": dict(), "stage": dict([(x, CP_Variation()) for x in self.cp.stage]),
                     "day_level_info": dict()}
@@ -96,6 +100,7 @@ class CP_Analyzer(object):
 
         return stat_var
 
+    '''
     def get_stage_by_split_visit(self, input_visit):
         """
         获取输入的visit的天与阶段的映射表
@@ -152,7 +157,7 @@ class CP_Analyzer(object):
             cur_stage_num = temp_stage_num
 
         return day_stage_map
-
+   
     def get_variation_of_visit(self, input_visit):
 
         """ 获取一个visit的变异情况
@@ -222,11 +227,11 @@ class CP_Analyzer(object):
                 stat_var["stage"][stage_num] = stat_var["stage"].setdefault(stage_num, set()).union(required_set.difference(intersec_set))
 
         return stat_var
+    '''
 
     def analyze_visits(self):
         self.__init_variation()
         for visit in self.visits.all_visits_dict.values():
-
             # stat_var = self.get_variation_of_visit(visit)
             # self.__update_variation_info(stat_var,visit.visit_id)
 
@@ -329,6 +334,7 @@ class CP_Analyzer(object):
             self.__add_variation_to_stage(stat_var["stage"][num],num)
 
     def __add_variation_to_visit(self, days_var, day_stage_map, visit_id):
+
         if visit_id not in self.visits.all_visits_dict:
             print("ERROR:input visit_id {} is invalid.".format(visit_id))
             return
@@ -398,16 +404,16 @@ class CP_Analyzer(object):
 
     def __analyze_by_fpgrowth(self, threshold=0.05, most_count=2):
         """
-            使用频繁模式挖掘算法，等到推荐的医嘱集合
+            使用频繁模式挖掘算法，得到推荐的医嘱集合
         :return: 返回的格式为:
             dict()格式
             stage_num ---> ['G06-220', 'G11-503', 'G11-555', 'U76-100', 'U76-K01']
         """
 
-        visit_variation = anlyzer.get_each_stage_visits_variation()
+        visit_variation = self.get_each_stage_visits_variation()
         stage_frequent = operate.get_all_stage_frequent_pattern(visit_variation, threshold, most_count)
 
-        recommend_order_dict = operate.selected_recomend_orders(input_cp, input_visits, anlyzer, stage_frequent)
+        recommend_order_dict = operate.selected_recomend_orders(self.cp, self.visits, self, stage_frequent)
 
         return recommend_order_dict
 
@@ -447,13 +453,17 @@ class CP_Analyzer(object):
             print("{}:{}".format(item,",".join([str(x) for x in l])))
 
     def show_recommend(self, recommend_order):
+        recommend_str = ""
         for key in sorted(recommend_order.keys()):
             order_list = list(recommend_order[key])
             print("stage:{},    {}".format(key, order_list))
+            recommend_str += "stage:{},    {}".format(key, order_list) + "\n"
 
             recommend_order_name = [(Orders_Dict.orders_dict[order_list[x]].order_name, order_list[x]) for x in range(len(order_list))]
             print("stage:{},    {}".format(key, sorted(recommend_order_name, key=lambda x:x[1], reverse=True)))
+            recommend_str += "stage:{},    {}".format(key, sorted(recommend_order_name, key=lambda x:x[1], reverse=True)) + "\n"
 
+        return recommend_str
     def get_each_stage_visits_variation(self):
         """
             处理self.variation["visits"]的所有visits
@@ -493,10 +503,9 @@ class CP_Analyzer(object):
                 visits_variation[stage].append(list(stage_items))
         return visits_variation
 
-
 if __name__ == "__main__":
-    input_cp = Clinical_Pathway("4,621",3)
-    input_visits = Build_Visist_Order("4,621",3)
+    input_cp = Clinical_Pathway("4,621", "3", "data/cp_info.csv", "data/cp_stage.csv", "data/cp_detail_order.csv", "data/cp_detail_info.csv")
+    input_visits = Build_Visist_Order("4,621", "3", "data/orders.csv")
 
     anlyzer = CP_Analyzer(input_cp,input_visits)
     anlyzer.show_var_info()
@@ -508,13 +517,13 @@ if __name__ == "__main__":
     # 获取推荐的医嘱集
     threshold = 0.05    # 变异项出现的频率
     most_count = 4      # 对每一阶段，最多推荐新增医嘱数目
-    # recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)
-    recommend_order = anlyzer.generate_recommendation()
+    recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)
+    # recommend_order = anlyzer.generate_recommendation()
     print("\n推荐更新:")
     anlyzer.show_recommend(recommend_order)
 
     # 将推荐的医嘱集加入临床路径并比较
-    operate.add_orders_and_show(input_cp, input_visits, anlyzer, recommend_order)
+    operate.add_orders_and_show(input_cp, anlyzer, recommend_order)
 
     print("\n+++++++++++++++++++++ Frequent Update CP +++++++++++++++++++++++++++++")
 
