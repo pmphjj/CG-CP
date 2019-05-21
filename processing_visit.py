@@ -267,7 +267,6 @@ def analyze_orders(input_cp, day_orders, input_orders, last_day_stage_num):
     :param last_day_stage_num: 上一天的终止阶段
     :return: 新开医嘱集中的异常情况
     """
-
     all_orders = day_orders + input_orders
     cur_stage_num = last_day_stage_num
     max_stage_num = input_cp.stage_nums
