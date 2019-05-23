@@ -200,7 +200,6 @@ class VISIT_Analyzer(object):
 
         return day_stage_map
 
-
     #注：应用新版的阶段划分方法
     def __get_stage_by_split_visit(self):
         """
@@ -259,6 +258,7 @@ class VISIT_Analyzer(object):
         return day_stage_map
 
 def analyze_orders(input_cp, day_orders, input_orders, last_day_stage_num):
+
     """
     获取新开医嘱集的变异情况
     :param input_cp: 临床路径

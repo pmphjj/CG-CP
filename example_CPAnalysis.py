@@ -9,7 +9,7 @@ import copy
 
 def process(cp_id, version_sqno, cp_info_path, cp_stage_path, cp_detail_order_path, cp_detail_info_path, orders_path):
     '''
-        临床路径分析类，根据病人的历史数据，给出临床路径的修改建议
+        临床路径分析方法实例，根据病人的历史数据，给出临床路径的修改建议
     :param cp_id: 要分析的临床路径的id
     :param version_sqno: 要分析临床路径的版本
     :param cp_info_path: 临床路径的基本信息文件路径; 该文件是一个csv格式，以\t作为分割符，来源于临床路径的CP_INFO表,包含的字段有：
@@ -46,8 +46,8 @@ def process(cp_id, version_sqno, cp_info_path, cp_stage_path, cp_detail_order_pa
     most_count = 3  # 对每一阶段，最多推荐新增医嘱数目
 
     # 两种方式
-    recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)   # 根据频繁模式挖掘获取推荐修改
-    # recommend_order = anlyzer.generate_recommendation()   # 基于统计
+    recommend_order = anlyzer.generate_recommendation("fpgrowth", threshold=threshold, most_count=most_count)   # 1. 根据频繁模式挖掘获取推荐修改
+    # recommend_order = anlyzer.generate_recommendation()   # 2. 基于统计
 
     print("\n推荐更新:")
     anlyzer.show_recommend(recommend_order)
