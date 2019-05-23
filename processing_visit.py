@@ -263,9 +263,20 @@ def analyze_orders(input_cp, day_orders, input_orders, last_day_stage_num):
     获取新开医嘱集的变异情况
     :param input_cp: 临床路径
     :param day_orders: 当天该病人已开过的医嘱集 list
+    [医嘱1，医嘱2，医嘱3，...] 每个医嘱是dict形式
     :param input_orders: 当前新开的医嘱集 list
-    :param last_day_stage_num: 上一天的终止阶段
-    :return: 新开医嘱集中的异常情况
+    [医嘱A，医嘱B，医嘱C，...] 每个医嘱是dict形式
+    :param last_day_stage_num: 上一天的终止阶段 int
+    :return: 新开医嘱集中的异常情况 list
+    对于新开医嘱集input_orders中的每个医嘱，都产生一个异常情况的记录
+    [(医嘱A, 异常A), (医嘱B, 异常B), (医嘱C,异常C), ...]
+    每个异常记录的结构为一个dict，具体如下：
+    {
+    "newadd_variation": 新增变异,
+    "dosage_variation": 剂量变异,
+    "planday_variation": 天数变异,
+    "freq_variation": 频率变异,
+    }
     """
     all_orders = day_orders + input_orders
     cur_stage_num = last_day_stage_num
@@ -326,9 +337,10 @@ def analyze_orders(input_cp, day_orders, input_orders, last_day_stage_num):
 
 
 if __name__ == "__main__":
+    #构造临床路径
+    cp = Clinical_Pathway("4,621", "3", "data/cp_info.csv", "data/cp_stage.csv", "data/cp_detail_order.csv", "data/cp_detail_info.csv")
 
-    cp = Clinical_Pathway("4,621", "3")
-    all_visits = Build_Visist_Order("4,621",3)
+    all_visits = Build_Visist_Order("4,621", "3", "data/orders.csv")
     visit_day_level_info = all_visits.all_visits_dict["3467225"].day_level_info
     print(len(visit_day_level_info))
 
@@ -337,15 +349,18 @@ if __name__ == "__main__":
         print(date)
         input_orders = []
         num = int(len(dayOrders_list)/2)
+        #生成当天已开过的医嘱集
         day_orders = dayOrders_list[0:num]
+        #生成新开的医嘱集
         input_orders = dayOrders_list[num:len(dayOrders_list)]
+        #判断输入的医嘱集input_orders的变异情况
         var_info = analyze_orders(cp,day_orders,input_orders,1)
         print()
 
-    visit_analyzer = VISIT_Analyzer(cp,dict())
-    for date in sorted(visit_day_level_info.keys()):
-        dayOrders_list = visit_day_level_info[date]
-        print()
-        for order in dayOrders_list:
-            visit_analyzer.add_order(date,order)
-        # visit_analyzer.delete_order(date,dayOrders_list[-1])
+    # visit_analyzer = VISIT_Analyzer(cp,dict())
+    # for date in sorted(visit_day_level_info.keys()):
+    #     dayOrders_list = visit_day_level_info[date]
+    #     print()
+    #     for order in dayOrders_list:
+    #         visit_analyzer.add_order(date,order)
+    #     # visit_analyzer.delete_order(date,dayOrders_list[-1])
