@@ -279,7 +279,14 @@ def get_order_var_info(order, cp_orders):
     基于临床路径规定医嘱集，计算输入医嘱的变异情况
     :param order: 输入的医嘱
     :param cp_orders: 临床路径规定医嘱集
-    :return: 输入医嘱的变异情况
+    :return: 输入医嘱的变异情况 dict
+    {
+    "newadd_variation": 新增变异,
+    "dosage_variation": 剂量变异,
+    "planday_variation": 天数变异,
+    "freq_variation": 频率变异,
+    }
+
     """
     order_code = order["CLINIC_ITEM_CODE"]
     #记录order的变异情况
